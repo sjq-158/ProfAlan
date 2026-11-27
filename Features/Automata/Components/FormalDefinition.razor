@@ -1,0 +1,101 @@
+<section class="card">
+    <div class="card-header">
+        <p class="eyebrow">Formal definition</p>
+        <span class="chip">@Machine.Kind.ShortName()</span>
+    </div>
+    <div class="space-y-3 p-4">
+        <p class="font-mono text-[15px]">M = @Tuple</p>
+
+        <dl class="grid grid-cols-[2.25rem_1fr] gap-x-2 gap-y-1.5 font-mono text-[13px]">
+            <dt class="text-muted">K</dt>
+            <dd class="break-words">@Set(Machine.States.Select(s => s.Name))</dd>
+
+            <dt class="text-muted">Σ</dt>
+            <dd class="break-words">@Set(Machine.Kind == MachineKind.Turing ? Machine.TapeAlphabet().Select(c => c.ToString()) : Machine.Alphabet.Select(c => c.ToString()))</dd>
+
+            @if (Machine.Kind == MachineKind.Pda)
+            {
+                <dt class="text-muted">Γ</dt>
+                <dd class="break-words">@Set(Machine.StackAlphabet.Select(c => c.ToString()))</dd>
+            }
+
+            <dt class="text-muted">s</dt>
+            <dd>@(Machine.InitialState?.Name ?? "not set")</dd>
+
+            @if (Machine.Kind == MachineKind.Turing)
+            {
+                <dt class="text-muted">H</dt>
+                <dd class="break-words">@Set(Machine.States.Where(s => s.IsHalting).Select(s => s.IsFinal ? $"{s.Name} (y)" : s.Name))</dd>
+            }
+            else
+            {
+                <dt class="text-muted">F</dt>
+                <dd class="break-words">@Set(Machine.States.Where(s => s.IsFinal).Select(s => s.Name))</dd>
+            }
+
+            <dt class="text-muted">@Machine.Kind.TransitionSymbol()</dt>
+            <dd>@Machine.Transitions.Count @(Machine.Transitions.Count == 1 ? "rule" : "rules")</dd>
+        </dl>
+
+        @if (!ReadOnly)
+        {
+            <div class="grid gap-3 border-t border-line pt-3 @(Machine.Kind == MachineKind.Pda ? "sm:grid-cols-2" : "")">
+                <div>
+                    <label class="label" for="@($"{id}-sigma")">@(Machine.Kind == MachineKind.Turing ? "Input symbols" : "Alphabet Σ")</label>
+                    <input id="@($"{id}-sigma")" class="field field-mono" value="@string.Join(", ", Machine.Alphabet)" placeholder="a, b"
+                           @onchange="e => SetAlphabetAsync(e.Value?.ToString(), stack: false)" />
+                </div>
+                @if (Machine.Kind == MachineKind.Pda)
+                {
+                    <div>
+                        <label class="label" for="@($"{id}-gamma")">Stack alphabet Γ</label>
+                        <input id="@($"{id}-gamma")" class="field field-mono" value="@string.Join(", ", Machine.StackAlphabet)" placeholder="a, b"
+                               @onchange="e => SetAlphabetAsync(e.Value?.ToString(), stack: true)" />
+                    </div>
+                }
+                @if (Machine.Kind == MachineKind.Turing)
+                {
+                    <p class="text-xs text-muted">⊔ (blank) and ▷ (left end) are always in Σ, plus any symbol a rule writes.</p>
+                }
+                @if (alphabetNote is not null)
+                {
+                    <p class="text-xs text-warn">@alphabetNote</p>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly string id = Guid.NewGuid().ToString("N")[..8];
+    private string? alphabetNote;
+
+    private string Tuple => Machine.Kind switch
+    {
+        MachineKind.Pda => "(K, Σ, Γ, Δ, s, F)",
+        MachineKind.Turing => "(K, Σ, δ, s, H)",
+        _ => $"(K, Σ, {Machine.Kind.TransitionSymbol()}, s, F)"
+    };
+
+    private static string Set(IEnumerable<string> items)
+    {
+        var list = items.ToList();
+        return list.Count == 0 ? "∅" : $"{{{string.Join(", ", list)}}}";
+    }
+
+    private async Task SetAlphabetAsync(string? text, bool stack)
+    {
+        var symbols = (text ?? "").Where(c => !char.IsWhiteSpace(c) && c != ',').Distinct().ToList();
+        var reserved = symbols.Where(c => !stack && Symbols.IsReserved(c)).ToList();
+        alphabetNote = reserved.Count > 0 ? $"Removed reserved symbol(s): {string.Join(" ", reserved)}." : null;
+        symbols = symbols.Except(reserved).ToList();
+
+        if (stack) Machine.StackAlphabet = symbols;
+        else Machine.Alphabet = symbols;
+        await OnChanged.InvokeAsync();
+    }
+}

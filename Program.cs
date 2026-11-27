@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using ProfAlan;
 using ProfAlan.Features.Auth.Services;
+using ProfAlan.Features.Automata.Services;
 using ProfAlan.Shared.Services;
 using ProfAlan.Shared.Supabase;
 
@@ -24,15 +25,18 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthSession>());
 builder.Services.AddScoped<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
+builder.Services.AddScoped<SandboxDrafts>();
 
 if (supabase.IsConfigured)
 {
     builder.Services.AddScoped<SupabaseRest>();
     builder.Services.AddScoped<IAuthGateway, SupabaseAuthGateway>();
+    builder.Services.AddScoped<IAutomatonLibrary, SupabaseAutomatonLibrary>();
 }
 else
 {
     builder.Services.AddScoped<IAuthGateway, DemoAuthGateway>();
+    builder.Services.AddScoped<IAutomatonLibrary, DemoAutomatonLibrary>();
 }
 
 await builder.Build().RunAsync();

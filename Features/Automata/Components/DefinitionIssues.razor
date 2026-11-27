@@ -1,0 +1,63 @@
+<section class="card">
+    <div class="card-header">
+        <p class="eyebrow">@Machine.Kind.ShortName() checker</p>
+        @if (Issues.Count == 0)
+        {
+            <span class="badge-pass"><Icon Name="check" Class="size-3" /> Valid @Machine.Kind.ShortName()</span>
+        }
+        else if (errors > 0)
+        {
+            <span class="badge-fail">@errors @(errors == 1 ? "error" : "errors")</span>
+        }
+        else
+        {
+            <span class="badge-warn">@Issues.Count @(Issues.Count == 1 ? "warning" : "warnings")</span>
+        }
+    </div>
+
+    @if (Issues.Count == 0)
+    {
+        <p class="px-4 py-3 text-sm text-muted">The definition satisfies every condition of a @Machine.Kind.FullName().ToLowerInvariant().</p>
+    }
+    else
+    {
+        <ul class="divide-y divide-line">
+            @foreach (var issue in Issues)
+            {
+                <li class="flex items-start gap-2.5 px-4 py-2.5 text-sm">
+                    <span class="@($"mt-0.5 {(issue.Severity == IssueSeverity.Error ? "text-fail" : "text-warn")}")">
+                        <Icon Name="@(issue.Severity == IssueSeverity.Error ? "x" : "alert")" />
+                    </span>
+                    <span class="flex-1">@issue.Message</span>
+                    @if (issue.Fix == IssueFix.AddTrapState && !ReadOnly)
+                    {
+                        <button type="button" class="btn shrink-0 px-2.5 py-1 text-xs" @onclick="AddTrapAsync">
+                            <Icon Name="wand" Class="size-3.5" /> Add trap state
+                        </button>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<DefinitionIssue> Issues { get; set; } = [];
+    private int errors;
+
+    protected override void OnParametersSet()
+    {
+        Issues = MachineEngines.For(Machine).Validate();
+        errors = Issues.Count(i => i.Severity == IssueSeverity.Error);
+    }
+
+    private async Task AddTrapAsync()
+    {
+        Machine.AddTrapState();
+        await OnChanged.InvokeAsync();
+    }
+}

@@ -1,0 +1,9 @@
+<div class="mb-5">
+    <h1 class="font-display text-2xl sm:text-3xl">@Title</h1>
+    <p class="mt-1 max-w-3xl text-sm text-muted">@Text</p>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string Text { get; set; } = "";
+}

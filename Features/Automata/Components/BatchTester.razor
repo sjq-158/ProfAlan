@@ -1,0 +1,58 @@
+<section class="card">
+    <div class="card-header">
+        <p class="eyebrow">Batch membership check</p>
+        @if (rows.Count > 0)
+        {
+            <span class="badge-muted">@rows.Count(r => r.Result.Accepted) of @rows.Count accepted</span>
+        }
+    </div>
+    <div class="space-y-3 p-4">
+        <div>
+            <label class="label" for="@($"{id}-batch")">One string per line. Write e for the empty string.</label>
+            <textarea id="@($"{id}-batch")" rows="4" class="field field-mono resize-y" @bind="text" placeholder="@Placeholder" spellcheck="false"></textarea>
+        </div>
+        <button type="button" class="btn w-full" disabled="@string.IsNullOrWhiteSpace(text)" @onclick="RunAll"><Icon Name="checks" /> Check all</button>
+
+        @if (rows.Count > 0)
+        {
+            <div class="max-h-64 overflow-y-auto rounded-lg border border-line">
+                <table class="w-full text-left text-sm">
+                    <thead class="sticky top-0 bg-soft text-xs text-muted">
+                        <tr><th class="px-3 py-2 font-medium">w</th><th class="px-3 py-2 font-medium">Result</th><th class="px-3 py-2 text-right font-medium">Steps</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in rows)
+                        {
+                            <tr class="border-t border-line" title="@row.Result.Explanation">
+                                <td class="px-3 py-1.5 font-mono">@Symbols.Show(row.Input)</td>
+                                <td class="px-3 py-1.5"><VerdictBadge Verdict="row.Result.Verdict" /></td>
+                                <td class="px-3 py-1.5 text-right font-mono text-muted">@Math.Max(0, row.Result.Path.Count - 1)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+
+    private readonly string id = Guid.NewGuid().ToString("N")[..8];
+    private string text = "";
+    private List<(string Input, ComputationResult Result)> rows = [];
+
+    private string Placeholder => string.Join("\n", new[] { "e", Machine.Alphabet.Count > 0 ? $"{Machine.Alphabet[0]}" : "a", "abba" });
+
+    private void RunAll()
+    {
+        var engine = MachineEngines.For(Machine);
+        rows = text.Replace("\r", "").Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0)
+            .Select(l => Symbols.IsEmpty(l) ? "" : l)
+            .Select(w => (w, engine.Run(w)))
+            .ToList();
+    }
+}

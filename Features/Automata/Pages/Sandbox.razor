@@ -1,0 +1,306 @@
+@page "/sandbox"
+@implements IDisposable
+@inject SandboxDrafts Drafts
+@inject IAutomatonLibrary Library
+@inject AuthSession Auth
+@inject Notifier Notifier
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Sandbox · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-[96rem] px-4 py-6 sm:px-6">
+    <div class="mb-5 flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-soft p-1" role="tablist" aria-label="Checker">
+            @foreach (var (slug, label, icon) in Modes)
+            {
+                <a href="@($"sandbox?kind={slug}")" role="tab" aria-selected="@(mode == slug)"
+                   class="@($"tab flex items-center gap-1.5 {(mode == slug ? "tab-active" : "")}")">
+                    <Icon Name="@icon" Class="size-3.5" /> @label
+                </a>
+            }
+        </div>
+
+        @if (machine is not null)
+        {
+            <div class="ml-auto flex flex-wrap items-center gap-2">
+                <div class="relative">
+                    <button type="button" class="btn" @onclick="() => examplesOpen = !examplesOpen">
+                        <Icon Name="book" /> Examples <Icon Name="chevron-down" Class="size-3.5" />
+                    </button>
+                    @if (examplesOpen)
+                    {
+                        <div class="fixed inset-0 z-40" @onclick="() => examplesOpen = false"></div>
+                        <div class="card absolute right-0 z-50 mt-2 w-80 p-1.5 shadow-lg">
+                            @foreach (var sample in SampleLibrary.For(machine.Kind))
+                            {
+                                <button type="button" class="flex w-full flex-col items-start rounded-md px-3 py-2 text-left hover:bg-soft" @onclick="() => AskReplace(sample.Build, sample.Title)">
+                                    <span class="text-sm font-medium">@sample.Title</span>
+                                    <span class="font-mono text-xs text-muted">@sample.Language</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+                <button type="button" class="btn" @onclick="() => AskReplace(() => Automaton.Blank(machine.Kind), null)"><Icon Name="plus" /> New</button>
+                <button type="button" class="btn" title="Download the definition as JSON" @onclick="ExportAsync"><Icon Name="download" /> <span class="hidden sm:inline">Export</span></button>
+                <button type="button" class="btn btn-primary" disabled="@saving" @onclick="SaveAsync">
+                    @if (saving)
+                    {
+                        <Spinner />
+                    }
+                    else
+                    {
+                        <Icon Name="save" />
+                    }
+                    Save
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (pendingReplace is not null)
+    {
+        <div class="card mb-5 flex flex-wrap items-center gap-3 border-warn/40 px-4 py-3 text-sm">
+            <Icon Name="alert" Class="size-4 text-warn" />
+            <span class="flex-1">Replace the current @machine?.Kind.ShortName() with @(pendingReplaceTitle ?? "a blank machine")? Unsaved changes to it will be lost.</span>
+            <button type="button" class="btn" @onclick="() => pendingReplace = null">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="ConfirmReplaceAsync">Replace</button>
+        </div>
+    }
+
+    @if (snapshot is null)
+    {
+        <div class="grid min-h-[50vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+    }
+    else if (mode == "cfg")
+    {
+        <Intro Title="Grammar checker" Text="Decide w ∈ L(G) with an Earley parser, then read off a leftmost derivation and its parse tree." />
+        <GrammarWorkbench Rules="@snapshot.Grammar" RulesChanged="SaveGrammarAsync" OnOpenMachine="OpenMachineAsync" />
+    }
+    else if (mode == "regex")
+    {
+        <Intro Title="Regular expression checker" Text="Validate a regular expression, test membership, and compare its language with another expression or with a finite automaton." />
+        <RegexWorkbench Expression="@snapshot.Regex" ExpressionChanged="SaveRegexAsync" FiniteMachines="Drafts.FiniteMachines" OnOpenMachine="OpenMachineAsync" />
+    }
+    else if (machine is not null)
+    {
+        <div class="mb-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+            <div class="min-w-0 flex-1">
+                <p class="eyebrow mb-1">@machine.Kind.FullName()</p>
+                <input class="w-full max-w-xl truncate border-b border-transparent bg-transparent font-display text-2xl outline-none transition hover:border-line focus:border-ink sm:text-3xl"
+                       value="@machine.Name" aria-label="Machine name" @onchange="e => RenameMachineAsync(e.Value?.ToString())" />
+                @if (!string.IsNullOrWhiteSpace(machine.Description))
+                {
+                    <p class="mt-1 text-sm text-muted">@machine.Description</p>
+                }
+            </div>
+            @if (SavedId is not null)
+            {
+                <span class="badge-muted"><Icon Name="check" Class="size-3" /> Saved to your library</span>
+            }
+        </div>
+
+        <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_25rem]">
+            <div class="min-w-0 space-y-5">
+                <MachineWorkbench Machine="machine" ActiveState="@active?.State" ActiveRuleId="@active?.RuleId" Outcome="outcome" OnChanged="OnMachineChangedAsync" />
+                <DefinitionIssues Machine="machine" OnChanged="OnMachineChangedAsync" />
+            </div>
+            <aside class="min-w-0 space-y-5">
+                <FormalDefinition Machine="machine" OnChanged="OnMachineChangedAsync" />
+                <ExecutionPanel Machine="machine" Revision="revision"
+                                OnConfigurationChanged="c => active = c" OnOutcomeChanged="v => outcome = v" OnRunCompleted="RecordRunAsync" />
+                <BatchTester Machine="machine" />
+            </aside>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "kind")] public string? KindQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "sample")] public string? SampleQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "id")] public Guid? SavedQuery { get; set; }
+
+    private static readonly (string Slug, string Label, string Icon)[] Modes =
+    [
+        ("dfa", "DFA", "graph"), ("nfa", "NFA", "graph"), ("pda", "PDA", "stack"),
+        ("tm", "TM", "tape"), ("cfg", "CFG", "grammar"), ("regex", "Regex", "regex")
+    ];
+
+    private SandboxDrafts.Snapshot? snapshot;
+    private string mode = "dfa";
+    private Automaton? machine;
+    private Configuration? active;
+    private Verdict? outcome;
+    private int revision;
+    private bool saving;
+    private bool examplesOpen;
+    private Func<Automaton>? pendingReplace;
+    private string? pendingReplaceTitle;
+    private string? handledQuery;
+
+    private Guid? SavedId => machine is not null && snapshot!.SavedIds.TryGetValue(machine.Kind, out var id) ? id : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        snapshot ??= await Drafts.LoadAsync();
+
+        var query = $"{KindQuery}|{SampleQuery}|{SavedQuery}";
+        if (query == handledQuery) return;
+        handledQuery = query;
+
+        if (SavedQuery is { } id)
+        {
+            await OpenSavedAsync(id);
+            return;
+        }
+
+        if (SampleQuery is not null && SampleLibrary.Find(SampleQuery) is { } sample)
+        {
+            var built = sample.Build();
+            snapshot.Machines[built.Kind] = built;
+            snapshot.SavedIds.Remove(built.Kind);
+            await Drafts.SaveAsync();
+            SwitchTo(built.Kind.Slug());
+            return;
+        }
+
+        SwitchTo(Modes.Any(m => m.Slug == KindQuery) ? KindQuery! : mode);
+    }
+
+    private void SwitchTo(string slug)
+    {
+        mode = slug;
+        machine = MachineKindNames.FromSlug(slug) is { } kind ? snapshot!.Machines[kind] : null;
+        active = null;
+        outcome = null;
+        pendingReplace = null;
+        examplesOpen = false;
+        revision++;
+    }
+
+    private async Task OpenSavedAsync(Guid id)
+    {
+        try
+        {
+            var saved = await Library.GetAsync(id);
+            if (saved is null)
+            {
+                Notifier.Error("That machine could not be found in your library.");
+                SwitchTo(mode);
+                return;
+            }
+            snapshot!.Machines[saved.Kind] = saved.Definition;
+            snapshot.SavedIds[saved.Kind] = saved.Id;
+            await Drafts.SaveAsync();
+            SwitchTo(saved.Kind.Slug());
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error(ex.Message);
+            SwitchTo(mode);
+        }
+    }
+
+    private async Task OnMachineChangedAsync()
+    {
+        revision++;
+        await Drafts.SaveAsync();
+    }
+
+    private async Task RenameMachineAsync(string? name)
+    {
+        if (machine is null || string.IsNullOrWhiteSpace(name)) return;
+        machine.Name = name.Trim();
+        await Drafts.SaveAsync();
+    }
+
+    private void AskReplace(Func<Automaton> build, string? title)
+    {
+        examplesOpen = false;
+        pendingReplace = build;
+        pendingReplaceTitle = title is null ? null : $"\"{title}\"";
+    }
+
+    private async Task ConfirmReplaceAsync()
+    {
+        if (pendingReplace is null || machine is null) return;
+        var replacement = pendingReplace();
+        snapshot!.Machines[replacement.Kind] = replacement;
+        snapshot.SavedIds.Remove(replacement.Kind);
+        await Drafts.SaveAsync();
+        SwitchTo(replacement.Kind.Slug());
+    }
+
+    private async Task OpenMachineAsync(Automaton built)
+    {
+        snapshot!.Machines[built.Kind] = built;
+        snapshot.SavedIds.Remove(built.Kind);
+        await Drafts.SaveAsync();
+        Navigation.NavigateTo($"sandbox?kind={built.Kind.Slug()}");
+        Notifier.Info($"Opened \"{built.Name}\" in the {built.Kind.ShortName()} builder.");
+    }
+
+    private async Task SaveGrammarAsync(string rules)
+    {
+        snapshot!.Grammar = rules;
+        await Drafts.SaveAsync();
+    }
+
+    private async Task SaveRegexAsync(string expression)
+    {
+        snapshot!.Regex = expression;
+        await Drafts.SaveAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (machine is null) return;
+        if (Auth.Current is null)
+        {
+            Notifier.Info("Sign in to save machines to your library. Your draft is kept in this browser.");
+            Navigation.NavigateTo($"login?returnUrl={Uri.EscapeDataString($"sandbox?kind={machine.Kind.Slug()}")}");
+            return;
+        }
+
+        saving = true;
+        try
+        {
+            var saved = await Library.SaveAsync(new SavedAutomaton(SavedId ?? Guid.NewGuid(), machine.Name, machine.Kind, machine, DateTimeOffset.UtcNow));
+            snapshot!.SavedIds[machine.Kind] = saved.Id;
+            await Drafts.SaveAsync();
+            Notifier.Success($"Saved \"{machine.Name}\".");
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Could not save: {ex.Message}");
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task RecordRunAsync(RunRecord run)
+    {
+        if (Auth.Current is null || machine is null) return;
+        try
+        {
+            await Library.RecordRunAsync(new SimulationRun(Guid.NewGuid(), machine.Name, machine.Kind, run.Input,
+                run.Result.Verdict, Math.Max(0, run.Result.Path.Count - 1), DateTimeOffset.UtcNow));
+        }
+        catch (Exception)
+        {
+            // Run history is a convenience; a failed write should never interrupt the visualizer.
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        if (machine is null) return;
+        var fileName = $"{new string(machine.Name.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant()}-{machine.Kind.Slug()}.json";
+        await JS.InvokeVoidAsync("profAlan.downloadText", fileName, machine.ToJson());
+    }
+
+    public void Dispose() => _ = Drafts.SaveAsync();
+}
