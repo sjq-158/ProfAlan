@@ -1,0 +1,41 @@
+<footer class="border-t border-line">
+    <div class="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div>
+            <a href="" class="flex items-center gap-2.5">
+                <BrandMark Class="size-8 text-ink" />
+                <span class="font-display text-xl">ProfAlan</span>
+            </a>
+            <p class="mt-4 max-w-xs text-sm leading-relaxed text-muted">
+                An automata theory studio. Definitions follow Lewis &amp; Papadimitriou,
+                <em>Elements of the Theory of Computation</em>, 2nd edition.
+            </p>
+        </div>
+        @foreach (var (heading, links) in Columns)
+        {
+            <nav aria-label="@heading">
+                <p class="eyebrow mb-4">@heading</p>
+                <ul class="space-y-2.5 text-sm">
+                    @foreach (var (label, href) in links)
+                    {
+                        <li><a href="@href" class="text-muted transition hover:text-ink">@label</a></li>
+                    }
+                </ul>
+            </nav>
+        }
+    </div>
+    <div class="border-t border-line">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted sm:px-6">
+            <span>CSIT321 Applications Development and Emerging Technologies · Final Project</span>
+            <span class="font-mono">(s, w) ⊢* (f, e)</span>
+        </div>
+    </div>
+</footer>
+
+@code {
+    private static readonly (string Heading, (string Label, string Href)[] Links)[] Columns =
+    [
+        ("Explore", [("Sandbox", "sandbox"), ("Quiz Arena", "quizzes"), ("Study Area", "study"), ("Dashboard", "dashboard")]),
+        ("Checkers", [("DFA and NFA", "sandbox?kind=dfa"), ("Pushdown automata", "sandbox?kind=pda"), ("Turing machines", "sandbox?kind=tm"), ("Grammars and regex", "sandbox?kind=cfg")]),
+        ("Learn", [("Theory notes", "study"), ("AI practice generator", "study/practice"), ("Worked examples", "sandbox?sample=dfa-a-bb"), ("Create an account", "register")])
+    ];
+}
