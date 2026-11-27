@@ -1,0 +1,91 @@
+@page "/"
+@using ProfAlan.Features.Home.Components
+
+<PageTitle>ProfAlan · Automata theory studio</PageTitle>
+
+<section class="relative overflow-hidden border-b border-line">
+    <div class="grid-paper absolute inset-0 opacity-40 [mask-image:linear-gradient(to_bottom,black,transparent)]"></div>
+    <div class="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:py-24">
+        <div>
+            <p class="eyebrow mb-4">Automata theory &amp; formal languages studio</p>
+            <h1 class="font-display text-5xl leading-[1.05] sm:text-6xl">Build machines.<br />Watch them compute.</h1>
+            <p class="mt-6 max-w-xl text-lg leading-relaxed text-muted">
+                ProfAlan is where you draw a DFA, PDA or Turing machine, step through every configuration
+                (q, w) ⊢ (q′, w′), check grammars and regular expressions, and get graded on hidden test cases,
+                all with the definitions of Lewis &amp; Papadimitriou.
+            </p>
+            <div class="mt-8 flex flex-wrap gap-3">
+                <a href="sandbox" class="btn btn-primary px-5 py-3 text-base"><Icon Name="flask" Class="size-5" /> Launch Studio</a>
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="dashboard" class="btn px-5 py-3 text-base"><Icon Name="dashboard" Class="size-5" /> Go to dashboard</a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="login" class="btn px-5 py-3 text-base"><Icon Name="user" Class="size-5" /> Sign in</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+            <dl class="mt-10 flex flex-wrap gap-x-8 gap-y-3 font-mono text-sm">
+                <div><dt class="text-muted">DFA</dt><dd>(K, Σ, δ, s, F)</dd></div>
+                <div><dt class="text-muted">PDA</dt><dd>(K, Σ, Γ, Δ, s, F)</dd></div>
+                <div><dt class="text-muted">TM</dt><dd>(K, Σ, δ, s, H)</dd></div>
+            </dl>
+        </div>
+        <MiniPreview />
+    </div>
+</section>
+
+<section class="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+    <p class="eyebrow mb-3">What is inside</p>
+    <h2 class="mb-10 max-w-2xl font-display text-3xl sm:text-4xl">Every tool for the course, in one studio</h2>
+
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @foreach (var feature in Features)
+        {
+            <a href="@feature.Href" class="card group flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-md">
+                <span class="mb-4 grid size-10 place-items-center rounded-lg bg-ink text-surface"><Icon Name="@feature.Icon" Class="size-5" /></span>
+                <h3 class="font-display text-lg">@feature.Title</h3>
+                <p class="mt-2 flex-1 text-sm leading-relaxed text-muted">@feature.Text</p>
+                <span class="mt-4 inline-flex items-center gap-1 text-sm font-medium">@feature.Action <Icon Name="arrow-right" Class="size-3.5 transition group-hover:translate-x-0.5" /></span>
+            </a>
+        }
+    </div>
+</section>
+
+<section class="border-y border-line bg-soft">
+    <div class="mx-auto grid max-w-7xl gap-8 px-4 py-14 sm:px-6 lg:grid-cols-3">
+        <div>
+            <p class="eyebrow mb-3">Faithful to the textbook</p>
+            <h2 class="font-display text-3xl">Checkers that know the definitions</h2>
+        </div>
+        <ul class="space-y-4 text-sm leading-relaxed lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-6 lg:space-y-0">
+            <li class="flex gap-3"><Icon Name="check" Class="mt-0.5 size-4 text-pass" /><span>A DFA must have exactly one δ(q, σ) for every state and symbol. Missing arrows are flagged, and a trap state is one click away.</span></li>
+            <li class="flex gap-3"><Icon Name="check" Class="mt-0.5 size-4 text-pass" /><span>A PDA accepts only at a final state with the input read and the stack empty: (s, w, e) ⊢* (p, e, e).</span></li>
+            <li class="flex gap-3"><Icon Name="check" Class="mt-0.5 size-4 text-pass" /><span>Turing machines start at (s, ▷⊔w), must move right on ▷, and halt in H, deciding with y and n.</span></li>
+            <li class="flex gap-3"><Icon Name="check" Class="mt-0.5 size-4 text-pass" /><span>Regular expressions are compared by language, with a shortest counterexample when two differ.</span></li>
+        </ul>
+    </div>
+</section>
+
+<section class="mx-auto max-w-7xl px-4 py-16 text-center sm:px-6">
+    <h2 class="font-display text-3xl sm:text-4xl">Start with the midterm review problems</h2>
+    <p class="mx-auto mt-3 max-w-xl text-muted">Open a worked example, change it, and see exactly which configuration goes wrong.</p>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="sandbox?sample=dfa-a-bb" class="btn">Starts with a, ends with bb</a>
+        <a href="sandbox?sample=nfa-bba" class="btn">Contains bba</a>
+        <a href="sandbox?sample=pda-wcwr" class="btn">wcwᴿ</a>
+        <a href="sandbox?sample=tm-anbn" class="btn">Decide aⁿbⁿ</a>
+    </div>
+</section>
+
+@code {
+    private sealed record Feature(string Icon, string Title, string Text, string Action, string Href);
+
+    private static readonly Feature[] Features =
+    [
+        new("graph", "Graphical & tabular builders", "Draw states and arrows on a canvas or fill in the δ / Δ table. Both views edit the same machine and stay in sync.", "Open the builder", "sandbox"),
+        new("play", "Step-by-step visualizer", "Play, pause and step through every configuration with the active state highlighted and the stack or tape shown live.", "Run a machine", "sandbox?sample=pda-anbn"),
+        new("checks", "CodeChum-style quizzes", "Solve problems against visible and hidden test cases. Instructors publish problems and review every submission.", "Browse problems", "quizzes"),
+        new("wand", "AI study area", "Read notes tied to the textbook, then let Gemini draft practice problems whose answers ProfAlan verifies.", "Start studying", "study")
+    ];
+}

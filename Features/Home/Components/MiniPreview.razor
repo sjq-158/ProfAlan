@@ -1,0 +1,87 @@
+@* A live, read-only DFA on the landing page: pick a string and watch the computation. *@
+@implements IDisposable
+
+<div class="card overflow-hidden shadow-xl">
+    <div class="card-header">
+        <div class="flex items-center gap-2">
+            <span class="size-2.5 rounded-full bg-fail/70"></span>
+            <span class="size-2.5 rounded-full bg-warn/70"></span>
+            <span class="size-2.5 rounded-full bg-pass/70"></span>
+            <span class="ml-2 font-mono text-xs text-muted">L = a(a ∪ b)*bb</span>
+        </div>
+        @if (AtEnd)
+        {
+            <VerdictBadge Verdict="result.Verdict" />
+        }
+        else
+        {
+            <span class="badge-muted font-mono">step @index</span>
+        }
+    </div>
+
+    <div class="grid-paper h-64 bg-card/40 sm:h-72">
+        <StateDiagram Machine="machine" ReadOnly="true" ActiveState="@result.Path[index].State" ActiveRuleId="@result.Path[index].RuleId" Outcome="@(AtEnd ? result.Verdict : null)" />
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 border-t border-line px-4 py-3">
+        <div class="flex gap-1 font-mono">
+            @for (var i = 0; i < word.Length; i++)
+            {
+                var read = i < index;
+                <span class="@($"grid size-7 place-items-center rounded-md border text-sm {(i == index ? "border-ink ring-2 ring-ink/20" : "border-line")} {(read ? "bg-soft text-muted" : "bg-card")}")">@word[i]</span>
+            }
+        </div>
+        <div class="ml-auto flex gap-1">
+            @foreach (var w in Words)
+            {
+                <button type="button" class="@($"chip transition {(w == word ? "border-ink bg-ink text-surface" : "hover:bg-soft")}")" @onclick="() => Start(w)">@w</button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly string[] Words = ["abb", "abab", "aabbb"];
+
+    private readonly Automaton machine = SampleLibrary.Find("dfa-a-bb")!.Build();
+    private string word = "abb";
+    private ComputationResult result = default!;
+    private int index;
+    private CancellationTokenSource? loop;
+
+    private bool AtEnd => index >= result.Path.Count - 1;
+
+    protected override void OnInitialized()
+    {
+        foreach (var s in machine.States) s.Y -= 80;
+        Start(word);
+    }
+
+    private void Start(string w)
+    {
+        word = w;
+        result = new DfaEngine(machine).Run(w);
+        index = 0;
+        loop?.Cancel();
+        loop = new CancellationTokenSource();
+        _ = PlayAsync(loop.Token);
+    }
+
+    private async Task PlayAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await Task.Delay(AtEnd ? 2200 : 850, token);
+                index = AtEnd ? 0 : index + 1;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public void Dispose() => loop?.Cancel();
+}
