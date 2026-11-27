@@ -15,17 +15,36 @@ public sealed record EdgeShape(
 
 /// <summary>
 /// Lays out arrows the way state diagrams are drawn by hand: forward arrows straight with
-/// the label above, a reverse arrow arcing below, self-loops on top of the state, and every
-/// rule on an arrow stacked as its own line.
+/// the label above, a reverse arrow arcing below, self-loops on the free side of the state,
+/// and every rule on an arrow stacked as its own line. Finite automata use the small-dot
+/// notation from the midterm review; PDAs and TMs keep labelled circles.
 /// </summary>
 public static class DiagramGeometry
 {
     public const double Radius = 26;
+    public const double DotRadius = 7;
     public const double Width = 900;
     public const double Height = 520;
     private const double LineHeight = 15;
 
     public static string F(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    public static bool UsesDots(MachineKind kind) => kind is MachineKind.Dfa or MachineKind.Nfa;
+
+    /// <summary>How far from a state's centre arrows start and end.</summary>
+    public static double NodeRadius(MachineKind kind) => UsesDots(kind) ? DotRadius + 4 : Radius;
+
+    /// <summary>World-space box around every state, with room for loops and labels.</summary>
+    public static (double X, double Y, double W, double H) Bounds(Automaton machine)
+    {
+        if (machine.States.Count == 0) return (0, 0, Width, Height);
+        var r = NodeRadius(machine.Kind);
+        var minX = machine.States.Min(s => s.X) - r - 70;
+        var maxX = machine.States.Max(s => s.X) + r + 60;
+        var minY = machine.States.Min(s => s.Y) - r - 90;
+        var maxY = machine.States.Max(s => s.Y) + r + 90;
+        return (minX, minY, maxX - minX, maxY - minY);
+    }
 
     public static IEnumerable<EdgeShape> Edges(Automaton machine)
     {
@@ -49,9 +68,10 @@ public static class DiagramGeometry
             }
 
             var hasReverse = groups.Any(g => g.Key.From == b.Name && g.Key.To == a.Name);
-            var blocked = machine.States.Any(c => c != a && c != b && DistanceToSegment(c, a, b) < Radius + 10);
+            var r = NodeRadius(machine.Kind);
+            var blocked = machine.States.Any(c => c != a && c != b && DistanceToSegment(c, a, b) < r + 12);
             var bend = blocked ? 58 : hasReverse ? 30 : 0;
-            yield return Arc(a, b, rules, labels, bend);
+            yield return Arc(a, b, rules, labels, bend, r);
         }
     }
 
@@ -68,18 +88,22 @@ public static class DiagramGeometry
     {
         var angle = FreeDirection(machine, s);
         var (ux, uy) = (Math.Cos(angle), Math.Sin(angle));
+        var dots = UsesDots(machine.Kind);
+        var r = NodeRadius(machine.Kind);
+        var reach = dots ? 48 : 70;
+        var labelDistance = dots ? 46 : 62;
 
         (double X, double Y) At(double offset, double distance) =>
             (s.X + Math.Cos(angle + offset) * distance, s.Y + Math.Sin(angle + offset) * distance);
 
-        var start = At(-0.52, Radius);
-        var end = At(0.52, Radius);
-        var c1 = At(-0.62, Radius + 70);
-        var c2 = At(0.62, Radius + 70);
+        var start = At(-0.52, r);
+        var end = At(0.52, r);
+        var c1 = At(-0.62, r + reach);
+        var c2 = At(0.62, r + reach);
         var path = $"M {F(start.X)} {F(start.Y)} C {F(c1.X)} {F(c1.Y)}, {F(c2.X)} {F(c2.Y)}, {F(end.X)} {F(end.Y)}";
 
-        var lx = s.X + ux * (Radius + 62);
-        var ly = s.Y + uy * (Radius + 62);
+        var lx = s.X + ux * (r + labelDistance);
+        var ly = s.Y + uy * (r + labelDistance);
         string anchor;
         List<EdgeLabelLine> lines;
         if (Math.Abs(ux) > 0.7)
@@ -109,12 +133,9 @@ public static class DiagramGeometry
             .Select(n => Math.Atan2(n.Y - s.Y, n.X - s.X))
             .ToList();
         if (s.IsInitial) neighbourAngles.Add(Math.PI);
+        if (UsesDots(machine.Kind)) neighbourAngles.Add(Math.PI / 2);
 
-        const double reach = Radius + 80;
-        double[] candidates = new[] { -Math.PI / 2, Math.PI / 2, 0, Math.PI }
-            .Where(a => s.X + Math.Cos(a) * reach is > 0 and < Width && s.Y + Math.Sin(a) * reach is > 0 and < Height)
-            .DefaultIfEmpty(-Math.PI / 2)
-            .ToArray();
+        double[] candidates = [-Math.PI / 2, Math.PI / 2, 0, Math.PI];
         if (neighbourAngles.Count == 0) return candidates[0];
 
         static double Gap(double a, double b)
@@ -131,7 +152,7 @@ public static class DiagramGeometry
             .First().Angle;
     }
 
-    private static EdgeShape Arc(StateNode a, StateNode b, List<TransitionRule> rules, List<(string Text, string? RuleId)> labels, double bend)
+    private static EdgeShape Arc(StateNode a, StateNode b, List<TransitionRule> rules, List<(string Text, string? RuleId)> labels, double bend, double r)
     {
         var dx = b.X - a.X;
         var dy = b.Y - a.Y;
@@ -144,8 +165,8 @@ public static class DiagramGeometry
         var cx = (a.X + b.X) / 2 + sx * bend;
         var cy = (a.Y + b.Y) / 2 + sy * bend;
 
-        var (x1, y1) = Toward(a.X, a.Y, cx, cy, Radius);
-        var (x2, y2) = Toward(b.X, b.Y, cx, cy, Radius + 1);
+        var (x1, y1) = Toward(a.X, a.Y, cx, cy, r);
+        var (x2, y2) = Toward(b.X, b.Y, cx, cy, r + 1);
         var path = bend == 0
             ? $"M {F(x1)} {F(y1)} L {F(x2)} {F(y2)}"
             : $"M {F(x1)} {F(y1)} Q {F(cx)} {F(cy)} {F(x2)} {F(y2)}";
@@ -193,7 +214,4 @@ public static class DiagramGeometry
         var py = a.Y + t * dy - p.Y;
         return Math.Sqrt(px * px + py * py);
     }
-
-    public static (double X, double Y) Clamp(double x, double y) =>
-        (Math.Clamp(x, Radius + 6, Width - Radius - 6), Math.Clamp(y, Radius + 70, Height - Radius - 8));
 }

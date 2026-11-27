@@ -1,4 +1,5 @@
 @using static ProfAlan.Features.Automata.Components.DiagramGeometry
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <div class="flex h-full flex-col">
@@ -6,11 +7,11 @@
     {
         <div class="flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-2">
             <div class="flex items-center gap-1 rounded-lg border border-line p-0.5" role="toolbar" aria-label="Canvas tools">
-                @ToolButton(DiagramTool.Select, "pointer", "Select and move (V)")
+                @ToolButton(DiagramTool.Select, "pointer", "Select, move and pan (V)")
                 @ToolButton(DiagramTool.State, "state", "Add state (S)")
                 @ToolButton(DiagramTool.Transition, "edge", "Add transition (T)")
             </div>
-            <button type="button" class="btn btn-ghost px-2.5 py-1.5" title="Arrange states left to right" @onclick="Arrange">
+            <button type="button" class="btn btn-ghost px-2.5 py-1.5" title="Arrange states left to right" @onclick="ArrangeAsync">
                 <Icon Name="layout" /> <span class="hidden sm:inline">Auto layout</span>
             </button>
             <button type="button" class="btn btn-ghost px-2.5 py-1.5 text-fail" title="Delete selection (Del)" disabled="@(selectedState is null && selectedEdge is null)" @onclick="DeleteSelection">
@@ -20,92 +21,127 @@
         </div>
     }
 
-    <div class="relative min-h-0 flex-1">
-        <div class="h-full outline-none" tabindex="@(ReadOnly ? -1 : 0)" @onkeydown="OnKeyDown">
-        <svg @ref="svg" viewBox="@ViewBox" preserveAspectRatio="xMidYMid meet"
-             class="@($"block h-full w-full select-none text-ink {(tool == DiagramTool.State && !ReadOnly ? "cursor-crosshair" : "")}")"
-             @onpointermove="OnPointerMove" @onpointerup="OnCanvasPointerUp" @onpointerleave="OnCanvasPointerUp">
-            <defs>
-                <marker id="@($"{id}-arrow")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                    <path d="M0 0 10 5 0 10z" fill="currentColor" />
-                </marker>
-                <marker id="@($"{id}-arrow-active")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-                    <path d="M0 0 10 5 0 10z" fill="currentColor" />
-                </marker>
-            </defs>
+    <div class="relative min-h-0 flex-1 overflow-hidden" @onpointerup="CancelPlacement" @onpointerleave="CancelPlacement">
+        <div @ref="canvas" class="h-full outline-none" tabindex="@(ReadOnly ? -1 : 0)" @onkeydown="OnKeyDown">
+            <svg @ref="svg" viewBox="@ViewBox" preserveAspectRatio="xMidYMid meet"
+                 class="@($"block h-full w-full touch-none select-none text-ink {CanvasCursor}")"
+                 @onpointermove="OnPointerMove" @onpointerup="OnCanvasPointerUp" @onpointerleave="OnCanvasPointerLeave">
+                <defs>
+                    <marker id="@($"{id}-arrow")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                        <path d="M0 0 10 5 0 10z" fill="currentColor" />
+                    </marker>
+                    <marker id="@($"{id}-arrow-active")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0 0 10 5 0 10z" fill="currentColor" />
+                    </marker>
+                    <pattern id="@($"{id}-dots")" width="24" height="24" patternUnits="userSpaceOnUse">
+                        <circle cx="12" cy="12" r="1" fill="currentColor" opacity="0.22" />
+                    </pattern>
+                </defs>
 
-            <rect width="100%" height="100%" fill="transparent" @onclick="OnBackgroundClick" />
+                @if (!ReadOnly)
+                {
+                    <rect x="-20000" y="-20000" width="40000" height="40000" fill="url(#@($"{id}-dots"))"
+                          @onpointerdown="OnBackgroundPointerDown" @onclick="OnBackgroundClick" />
+                }
 
-            @if (Machine.States.Count == 0 && !ReadOnly)
-            {
-                <g>
-                    <text x="@F(Width / 2)" y="@F(Height / 2)" text-anchor="middle" class="fill-current font-sans text-[15px] opacity-50">
-                        Choose "Add state" and click anywhere to place the first state.
-                    </text>
-                </g>
-            }
+                @if (Machine.States.Count == 0 && !ReadOnly)
+                {
+                    <g class="pointer-events-none">
+                        <text x="@F(Width / 2)" y="@F(Height / 2)" text-anchor="middle" class="fill-current font-sans text-[15px] opacity-50">
+                            Drag a shape from the palette, or choose "Add state" and click the canvas.
+                        </text>
+                    </g>
+                }
 
-            @foreach (var edge in DiagramGeometry.Edges(Machine))
-            {
-                var active = ActiveRuleId is not null && edge.Rules.Any(r => r.Id == ActiveRuleId);
-                var selected = selectedEdge == (edge.From, edge.To);
-                <g class="@(ReadOnly ? "" : "cursor-pointer")" @onclick="() => SelectEdge(edge)" @onclick:stopPropagation="true">
-                    <path d="@edge.Path" fill="none" stroke="transparent" stroke-width="16" />
-                    <path d="@edge.Path" fill="none" stroke="currentColor"
-                          stroke-width="@(active ? 2.8 : selected ? 2.4 : 1.5)"
-                          stroke-dasharray="@(selected && !active ? "5 3" : null)"
-                          marker-end="url(#@($"{id}-{(active ? "arrow-active" : "arrow")}"))" />
-                    @foreach (var line in edge.Lines)
+                @foreach (var edge in DiagramGeometry.Edges(Machine))
+                {
+                    var active = ActiveRuleId is not null && edge.Rules.Any(r => r.Id == ActiveRuleId);
+                    var selected = selectedEdge == (edge.From, edge.To);
+                    <g class="@(ReadOnly ? "" : "cursor-pointer")" @onclick="() => SelectEdge(edge)" @onclick:stopPropagation="true"
+                       @onpointerdown:stopPropagation="true">
+                        <path d="@edge.Path" fill="none" stroke="transparent" stroke-width="16" />
+                        <path d="@edge.Path" fill="none" stroke="currentColor"
+                              stroke-width="@(active ? 2.8 : selected ? 2.4 : 1.5)"
+                              stroke-dasharray="@(selected && !active ? "5 3" : null)"
+                              marker-end="url(#@($"{id}-{(active ? "arrow-active" : "arrow")}"))" />
+                        @foreach (var line in edge.Lines)
+                        {
+                            var lineActive = active && (line.RuleId == ActiveRuleId || line.RuleId is null);
+                            <g>
+                                <text x="@F(line.X)" y="@F(line.Y)" text-anchor="@edge.Anchor"
+                                      class="@($"fill-current font-mono text-[13px] {(lineActive ? "font-semibold" : "")}")"
+                                      paint-order="stroke" stroke="var(--pa-card)" stroke-width="4" stroke-linejoin="round">@line.Text</text>
+                            </g>
+                        }
+                    </g>
+                }
+
+                @if (pendingFrom is not null && Machine.FindState(pendingFrom) is { } from)
+                {
+                    <line x1="@F(from.X)" y1="@F(from.Y)" x2="@F(pointer.X)" y2="@F(pointer.Y)"
+                          stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#@($"{id}-arrow"))" class="pointer-events-none" />
+                }
+
+                @foreach (var s in Machine.States)
+                {
+                    var isActive = s.Name == ActiveState;
+                    var isSelected = selectedState == s.Name;
+                    <g class="@(ReadOnly ? "" : tool == DiagramTool.Transition ? "cursor-cell" : "cursor-grab")"
+                       @onpointerdown="e => OnStatePointerDown(e, s)" @onpointerdown:stopPropagation="true"
+                       @onpointerup="() => OnStatePointerUp(s)" @onpointerup:stopPropagation="true"
+                       @onclick:stopPropagation="true" @ondblclick="() => ToggleFinal(s)">
+                        @StateShape(s, isActive, isSelected)
+                    </g>
+                    @if (!ReadOnly && isSelected && tool == DiagramTool.Select)
                     {
-                        var lineActive = active && (line.RuleId == ActiveRuleId || line.RuleId is null);
-                        <g>
-                            <text x="@F(line.X)" y="@F(line.Y)" text-anchor="@edge.Anchor"
-                                  class="@($"fill-current font-mono text-[13px] {(lineActive ? "font-semibold" : "")}")"
-                                  paint-order="stroke" stroke="var(--pa-card)" stroke-width="4" stroke-linejoin="round">@line.Text</text>
+                        var hx = s.X + NodeRadius(Machine.Kind) + 16;
+                        <g class="cursor-crosshair" @onpointerdown="e => StartConnector(e, s)" @onpointerdown:stopPropagation="true">
+                            <title>Drag to another state to add a transition</title>
+                            <circle cx="@F(hx)" cy="@F(s.Y)" r="8" fill="var(--pa-ink)" />
+                            <path d="@($"M {F(hx - 3.5)} {F(s.Y)} H {F(hx + 3.5)} M {F(hx)} {F(s.Y - 3.5)} V {F(s.Y + 3.5)}")" stroke="var(--pa-surface)" stroke-width="1.6" />
                         </g>
                     }
-                </g>
-            }
+                }
 
-            @if (pendingFrom is not null && Machine.FindState(pendingFrom) is { } from)
-            {
-                <line x1="@F(from.X)" y1="@F(from.Y)" x2="@F(pointer.X)" y2="@F(pointer.Y)"
-                      stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#@($"{id}-arrow"))" class="pointer-events-none" />
-            }
-
-            @foreach (var s in Machine.States)
-            {
-                var isActive = s.Name == ActiveState;
-                var isSelected = selectedState == s.Name;
-                var ring = isActive ? OutcomeStroke : "currentColor";
-                <g class="@(ReadOnly ? "" : tool == DiagramTool.Transition ? "cursor-cell" : "cursor-grab")"
-                   @onpointerdown="e => OnStatePointerDown(e, s)" @onpointerdown:stopPropagation="true"
-                   @onpointerup="() => OnStatePointerUp(s)" @onpointerup:stopPropagation="true"
-                   @onclick:stopPropagation="true" @ondblclick="() => ToggleFinal(s)">
-                    @if (s.IsInitial)
-                    {
-                        <line x1="@F(s.X - Radius - 40)" y1="@F(s.Y)" x2="@F(s.X - Radius - 1)" y2="@F(s.Y)"
-                              stroke="currentColor" stroke-width="1.6" marker-end="url(#@($"{id}-arrow"))" />
-                    }
-                    @if (isSelected)
-                    {
-                        <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius + 7)" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" />
-                    }
-                    <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius)"
-                            fill="@(isActive ? OutcomeFill : "var(--pa-card)")" stroke="@ring"
-                            stroke-width="@(isActive ? 3 : 1.8)" class="@(isActive && Outcome is null ? "state-active" : "")" />
-                    @if (s.IsFinal || (Machine.Kind == MachineKind.Turing && s.IsHalting))
-                    {
-                        <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius - 5)" fill="none"
-                                stroke="@(isActive ? "var(--pa-surface)" : "currentColor")" stroke-width="1.4"
-                                stroke-dasharray="@(Machine.Kind == MachineKind.Turing && !s.IsFinal ? "3 2" : null)" />
-                    }
-                    <text x="@F(s.X)" y="@F(s.Y + 4.5)" text-anchor="middle"
-                          class="font-mono text-[13px] font-medium" fill="@(isActive ? "var(--pa-surface)" : "currentColor")">@s.Name</text>
-                </g>
-            }
-        </svg>
+                @if (placing is { } ghost && placingVisible)
+                {
+                    <g class="pointer-events-none" opacity="0.55">
+                        @StateShape(new StateNode { Name = "q?", X = pointer.X, Y = pointer.Y, IsInitial = ghost.Initial, IsFinal = ghost.Final, IsHalting = ghost.Halting }, false, false)
+                    </g>
+                }
+            </svg>
         </div>
+
+        @if (!ReadOnly)
+        {
+            <div class="absolute left-3 top-3 flex flex-col gap-1 rounded-xl border border-line bg-card/95 p-1.5 shadow-sm" role="group" aria-label="Shapes">
+                <p class="px-1.5 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">Shapes</p>
+                @foreach (var item in Palette)
+                {
+                    <button type="button" title="@($"Drag onto the canvas to add {item.Label.ToLowerInvariant()}")"
+                            class="flex cursor-grab items-center gap-2 rounded-lg px-1.5 py-1 text-left text-xs transition hover:bg-soft active:cursor-grabbing"
+                            @onpointerdown="e => StartPlacement(e, item)" @onpointerdown:preventDefault="true"
+                            @onclick="() => AddStateAtAsync((pan.X + Width / zoom / 2, pan.Y + Height / zoom / 2), item)">
+                        <svg viewBox="-20 -14 40 28" class="h-6 w-9 shrink-0 text-ink" aria-hidden="true">@PaletteIcon(item)</svg>
+                        <span class="hidden sm:inline">@item.Label</span>
+                    </button>
+                }
+            </div>
+
+            <div class="absolute bottom-3 left-3 flex items-center gap-0.5 rounded-full border border-line bg-card/95 p-1 shadow-sm">
+                <button type="button" class="grid size-7 place-items-center rounded-full hover:bg-soft" title="Zoom out" aria-label="Zoom out" @onclick="() => ZoomAroundCenter(1 / 1.25)">
+                    <Icon Name="minus" Class="size-3.5" />
+                </button>
+                <button type="button" class="min-w-12 rounded-full px-1 font-mono text-[11px] hover:bg-soft" title="Reset to 100%" @onclick="ResetZoom">@(Math.Round(zoom * 100))%</button>
+                <button type="button" class="grid size-7 place-items-center rounded-full hover:bg-soft" title="Zoom in" aria-label="Zoom in" @onclick="() => ZoomAroundCenter(1.25)">
+                    <Icon Name="plus" Class="size-3.5" />
+                </button>
+                <span class="mx-0.5 h-4 w-px bg-line"></span>
+                <button type="button" class="grid size-7 place-items-center rounded-full hover:bg-soft" title="Fit diagram to screen" aria-label="Fit to screen" @onclick="FitToScreen">
+                    <Icon Name="fit" Class="size-3.5" />
+                </button>
+            </div>
+        }
 
         @if (!ReadOnly && (selectedState is not null || selectedEdge is not null))
         {
@@ -127,8 +163,17 @@
 
     private enum DiagramTool { Select, State, Transition }
 
+    private sealed record PaletteItem(string Label, bool Initial, bool Final, bool Halting);
+
+    private const double MinZoom = 0.25;
+    private const double MaxZoom = 4;
+
     private readonly string id = $"sd{Guid.NewGuid():N}"[..10];
     private ElementReference svg;
+    private ElementReference canvas;
+    private DotNetObjectReference<StateDiagram>? self;
+    private Automaton? shownMachine;
+
     private DiagramTool tool = DiagramTool.Select;
     private string? selectedState;
     private (string From, string To)? selectedEdge;
@@ -138,46 +183,152 @@
     private (double X, double Y) pointer;
     private bool moved;
 
-    private string OutcomeFill => Outcome switch
+    private double zoom = 1;
+    private (double X, double Y) pan;
+    private bool panning;
+    private bool panMoved;
+    private (double X, double Y) panStartClient;
+    private (double X, double Y) panStartOrigin;
+    private double panScale = 1;
+
+    private PaletteItem? placing;
+    private bool placingVisible;
+
+    private IReadOnlyList<PaletteItem> Palette => Machine.Kind == MachineKind.Turing
+        ?
+        [
+            new("State", false, false, false),
+            new("Initial state", true, false, false),
+            new("Halting state", false, false, true),
+            new("Accepting halt (y)", false, true, true)
+        ]
+        :
+        [
+            new("State", false, false, false),
+            new("Initial state", true, false, false),
+            new("Final state", false, true, false)
+        ];
+
+    private string OutcomeColor => Outcome switch
     {
         Verdict.Accepted => "var(--color-pass)",
         Verdict.Rejected or Verdict.DidNotHalt => "var(--color-fail)",
         _ => "var(--pa-ink)"
     };
 
-    private string OutcomeStroke => Outcome switch
-    {
-        Verdict.Accepted => "var(--color-pass)",
-        Verdict.Rejected or Verdict.DidNotHalt => "var(--color-fail)",
-        _ => "var(--pa-ink)"
-    };
-
-    /// <summary>The editor keeps a fixed canvas; read-only previews zoom to fit their states.</summary>
     private string ViewBox
     {
         get
         {
-            if (!ReadOnly || Machine.States.Count == 0) return $"0 0 {F(Width)} {F(Height)}";
-            var minX = Machine.States.Min(s => s.X) - Radius - 60;
-            var maxX = Machine.States.Max(s => s.X) + Radius + 50;
-            var minY = Machine.States.Min(s => s.Y) - Radius - 85;
-            var maxY = Machine.States.Max(s => s.Y) + Radius + 85;
-            return $"{F(minX)} {F(minY)} {F(maxX - minX)} {F(maxY - minY)}";
+            if (ReadOnly)
+            {
+                var (x, y, w, h) = Bounds(Machine);
+                return $"{F(x)} {F(y)} {F(w)} {F(h)}";
+            }
+            return $"{F(pan.X)} {F(pan.Y)} {F(Width / zoom)} {F(Height / zoom)}";
         }
     }
+
+    private string CanvasCursor => ReadOnly ? "" : placing is not null ? "cursor-copy"
+        : panning ? "cursor-grabbing" : tool == DiagramTool.State ? "cursor-crosshair" : "";
 
     private string Hint => tool switch
     {
         DiagramTool.State => "Click empty space to add a state. Double-click a state to toggle final.",
         DiagramTool.Transition => "Drag from one state to another (or onto itself) to add a transition.",
-        _ => "Drag states to move them. Click a state or arrow to edit it."
+        _ => "Scroll to zoom, drag empty space to pan. Drag a selected state's + handle to connect it."
     };
 
     protected override void OnParametersSet()
     {
+        if (!ReferenceEquals(shownMachine, Machine))
+        {
+            shownMachine = Machine;
+            ClearSelection();
+            FitToScreen();
+        }
         if (selectedState is not null && Machine.FindState(selectedState) is null) selectedState = null;
         if (selectedEdge is { } e && !Machine.Transitions.Any(t => t.From == e.From && t.To == e.To)) selectedEdge = null;
     }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !ReadOnly)
+        {
+            self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("profAlan.attachWheelZoom", canvas, self);
+        }
+    }
+
+    private RenderFragment StateShape(StateNode s, bool isActive, bool isSelected) => __builder =>
+    {
+        var r = NodeRadius(Machine.Kind);
+        if (s.IsInitial)
+        {
+            <line x1="@F(s.X - r - 40)" y1="@F(s.Y)" x2="@F(s.X - r - 1)" y2="@F(s.Y)"
+                  stroke="currentColor" stroke-width="1.6" marker-end="url(#@($"{id}-arrow"))" />
+        }
+
+        if (UsesDots(Machine.Kind))
+        {
+            <circle cx="@F(s.X)" cy="@F(s.Y)" r="18" fill="transparent" />
+            if (isSelected)
+            {
+                <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(DotRadius + 10)" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" opacity="0.7" />
+            }
+            if (s.IsFinal)
+            {
+                <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(DotRadius + 4)" fill="none" stroke="@(isActive ? OutcomeColor : "currentColor")" stroke-width="1.5" />
+            }
+            <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(DotRadius)" fill="@(isActive ? OutcomeColor : "var(--pa-card)")"
+                    stroke="@(isActive ? OutcomeColor : "currentColor")" stroke-width="1.8" class="@(isActive && Outcome is null ? "state-active" : "")" />
+            <g>
+                <text x="@F(s.X)" y="@F(s.Y + DotRadius + 20)" text-anchor="middle"
+                      class="@($"fill-current font-mono text-[13px] {(isActive ? "font-semibold" : "")}")"
+                      paint-order="stroke" stroke="var(--pa-card)" stroke-width="4" stroke-linejoin="round">@s.Name</text>
+            </g>
+        }
+        else
+        {
+            if (isSelected)
+            {
+                <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius + 7)" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" />
+            }
+            <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius)"
+                    fill="@(isActive ? OutcomeColor : "var(--pa-card)")" stroke="@(isActive ? OutcomeColor : "currentColor")"
+                    stroke-width="@(isActive ? 3 : 1.8)" class="@(isActive && Outcome is null ? "state-active" : "")" />
+            if (s.IsFinal || (Machine.Kind == MachineKind.Turing && s.IsHalting))
+            {
+                <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius - 5)" fill="none"
+                        stroke="@(isActive ? "var(--pa-surface)" : "currentColor")" stroke-width="1.4"
+                        stroke-dasharray="@(Machine.Kind == MachineKind.Turing && !s.IsFinal ? "3 2" : null)" />
+            }
+            <g>
+                <text x="@F(s.X)" y="@F(s.Y + 4.5)" text-anchor="middle"
+                      class="font-mono text-[13px] font-medium" fill="@(isActive ? "var(--pa-surface)" : "currentColor")">@s.Name</text>
+            </g>
+        }
+    };
+
+    private RenderFragment PaletteIcon(PaletteItem item) => __builder =>
+    {
+        var dots = UsesDots(Machine.Kind);
+        var r = dots ? 4.5 : 9;
+        if (item.Initial)
+        {
+            <path d="@($"M -19 0 H {F(-r - 2)}")" stroke="currentColor" stroke-width="1.6" />
+            <path d="@($"M {F(-r - 6)} -3.5 L {F(-r - 1.5)} 0 L {F(-r - 6)} 3.5 Z")" fill="currentColor" />
+        }
+        <circle cx="0" cy="0" r="@F(r)" fill="var(--pa-card)" stroke="currentColor" stroke-width="1.6" />
+        if (item.Final)
+        {
+            <circle cx="0" cy="0" r="@F(dots ? r + 3 : r - 3)" fill="none" stroke="currentColor" stroke-width="1.3" />
+        }
+        else if (item.Halting)
+        {
+            <circle cx="0" cy="0" r="@F(r - 3)" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2 1.5" />
+        }
+    };
 
     private RenderFragment ToolButton(DiagramTool value, string icon, string title) => __builder =>
     {
@@ -194,23 +345,72 @@
         pendingFrom = null;
     }
 
-    private (double X, double Y) ToSvg(PointerEventArgs e)
+    private (double X, double Y) ToWorld(double clientX, double clientY)
     {
-        var point = ((IJSInProcessRuntime)JS).Invoke<SvgPoint>("profAlan.svgPoint", svg, e.ClientX, e.ClientY);
+        var point = ((IJSInProcessRuntime)JS).Invoke<SvgPoint>("profAlan.svgPoint", svg, clientX, clientY);
         return (point.X, point.Y);
+    }
+
+    [JSInvokable]
+    public void OnWheelZoom(double deltaY, double clientX, double clientY)
+    {
+        var factor = Math.Exp(-deltaY * 0.0015);
+        ZoomAt(ToWorld(clientX, clientY), factor);
+        StateHasChanged();
+    }
+
+    private void ZoomAt((double X, double Y) anchor, double factor)
+    {
+        var next = Math.Clamp(zoom * factor, MinZoom, MaxZoom);
+        var ratio = zoom / next;
+        pan = (anchor.X - (anchor.X - pan.X) * ratio, anchor.Y - (anchor.Y - pan.Y) * ratio);
+        zoom = next;
+    }
+
+    private void ZoomAroundCenter(double factor) =>
+        ZoomAt((pan.X + Width / zoom / 2, pan.Y + Height / zoom / 2), factor);
+
+    private void ResetZoom()
+    {
+        var center = (X: pan.X + Width / zoom / 2, Y: pan.Y + Height / zoom / 2);
+        zoom = 1;
+        pan = (center.X - Width / 2, center.Y - Height / 2);
+    }
+
+    private void FitToScreen()
+    {
+        if (Machine.States.Count == 0)
+        {
+            zoom = 1;
+            pan = (0, 0);
+            return;
+        }
+        var (x, y, w, h) = Bounds(Machine);
+        zoom = Math.Clamp(Math.Min(Width / w, Height / h), MinZoom, 1.6);
+        pan = (x + w / 2 - Width / zoom / 2, y + h / 2 - Height / zoom / 2);
+    }
+
+    private void OnBackgroundPointerDown(PointerEventArgs e)
+    {
+        if (ReadOnly || tool != DiagramTool.Select || e.Button is not (0 or 1)) return;
+        panning = true;
+        panMoved = false;
+        panStartClient = (e.ClientX, e.ClientY);
+        panStartOrigin = pan;
+        panScale = ((IJSInProcessRuntime)JS).Invoke<double>("profAlan.svgScale", svg);
     }
 
     private async Task OnBackgroundClick(MouseEventArgs e)
     {
         if (ReadOnly) return;
+        if (panMoved)
+        {
+            panMoved = false;
+            return;
+        }
         if (tool == DiagramTool.State)
         {
-            var point = ((IJSInProcessRuntime)JS).Invoke<SvgPoint>("profAlan.svgPoint", svg, e.ClientX, e.ClientY);
-            var (x, y) = Clamp(point.X, point.Y);
-            var state = Machine.AddState(x, y);
-            selectedState = state.Name;
-            selectedEdge = null;
-            await NotifyChangedAsync();
+            await AddStateAtAsync(ToWorld(e.ClientX, e.ClientY), new PaletteItem("State", false, false, false));
             return;
         }
         ClearSelection();
@@ -219,7 +419,7 @@
     private void OnStatePointerDown(PointerEventArgs e, StateNode s)
     {
         if (ReadOnly || e.Button != 0) return;
-        var p = ToSvg(e);
+        var p = ToWorld(e.ClientX, e.ClientY);
         pointer = p;
 
         if (tool == DiagramTool.Transition)
@@ -235,14 +435,40 @@
         selectedEdge = null;
     }
 
+    private void StartConnector(PointerEventArgs e, StateNode s)
+    {
+        if (e.Button != 0) return;
+        pointer = ToWorld(e.ClientX, e.ClientY);
+        pendingFrom = s.Name;
+    }
+
+    private void StartPlacement(PointerEventArgs e, PaletteItem item)
+    {
+        if (e.Button != 0) return;
+        placing = item;
+        placingVisible = false;
+    }
+
     private void OnPointerMove(PointerEventArgs e)
     {
-        if (ReadOnly || (dragging is null && pendingFrom is null)) return;
-        pointer = ToSvg(e);
+        if (ReadOnly) return;
+
+        if (panning)
+        {
+            var dx = (e.ClientX - panStartClient.X) / panScale;
+            var dy = (e.ClientY - panStartClient.Y) / panScale;
+            if (Math.Abs(dx) + Math.Abs(dy) > 2 / panScale) panMoved = true;
+            pan = (panStartOrigin.X - dx, panStartOrigin.Y - dy);
+            return;
+        }
+
+        if (dragging is null && pendingFrom is null && placing is null) return;
+        pointer = ToWorld(e.ClientX, e.ClientY);
+        placingVisible = placing is not null;
 
         if (dragging is not null && Machine.FindState(dragging) is { } s)
         {
-            (s.X, s.Y) = Clamp(pointer.X + dragOffset.X, pointer.Y + dragOffset.Y);
+            (s.X, s.Y) = (Math.Round(pointer.X + dragOffset.X), Math.Round(pointer.Y + dragOffset.Y));
             moved = true;
         }
     }
@@ -260,10 +486,43 @@
         await EndDragAsync();
     }
 
-    private async Task OnCanvasPointerUp()
+    private async Task OnCanvasPointerUp(PointerEventArgs e)
     {
+        panning = false;
         pendingFrom = null;
+        if (placing is { } item)
+        {
+            placing = null;
+            placingVisible = false;
+            await AddStateAtAsync(ToWorld(e.ClientX, e.ClientY), item);
+            return;
+        }
         await EndDragAsync();
+    }
+
+    private async Task OnCanvasPointerLeave()
+    {
+        panning = false;
+        pendingFrom = null;
+        placingVisible = false;
+        await EndDragAsync();
+    }
+
+    private void CancelPlacement()
+    {
+        placing = null;
+        placingVisible = false;
+    }
+
+    private async Task AddStateAtAsync((double X, double Y) at, PaletteItem item)
+    {
+        var state = Machine.AddState(Math.Round(at.X), Math.Round(at.Y));
+        if (item.Initial) Machine.MakeInitial(state);
+        state.IsFinal = item.Final;
+        state.IsHalting = item.Halting;
+        selectedState = state.Name;
+        selectedEdge = null;
+        await NotifyChangedAsync();
     }
 
     private async Task EndDragAsync()
@@ -323,9 +582,10 @@
         await NotifyChangedAsync();
     }
 
-    private async Task Arrange()
+    private async Task ArrangeAsync()
     {
         Machine.ArrangeLeftToRight(Width, Height);
+        FitToScreen();
         await NotifyChangedAsync();
     }
 
@@ -354,6 +614,7 @@
             case "Escape":
                 ClearSelection();
                 pendingFrom = null;
+                CancelPlacement();
                 break;
             case "v" or "V":
                 SetTool(DiagramTool.Select);
@@ -363,6 +624,15 @@
                 break;
             case "t" or "T":
                 SetTool(DiagramTool.Transition);
+                break;
+            case "+" or "=":
+                ZoomAroundCenter(1.25);
+                break;
+            case "-" or "_":
+                ZoomAroundCenter(1 / 1.25);
+                break;
+            case "0":
+                FitToScreen();
                 break;
         }
     }
@@ -374,6 +644,19 @@
     }
 
     private Task NotifyChangedAsync() => OnChanged.InvokeAsync();
+
+    public async ValueTask DisposeAsync()
+    {
+        if (self is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("profAlan.detachWheelZoom", canvas);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        self.Dispose();
+    }
 
     private sealed record SvgPoint(double X, double Y);
 }

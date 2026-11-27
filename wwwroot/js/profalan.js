@@ -32,6 +32,29 @@ window.profAlan = {
         return { x: p.x, y: p.y };
     },
 
+    // Wheel zoom needs a non-passive listener so the page does not scroll underneath the canvas.
+    attachWheelZoom: function (element, dotnet) {
+        if (!element || element.__profAlanWheel) return;
+        var handler = function (e) {
+            e.preventDefault();
+            dotnet.invokeMethodAsync("OnWheelZoom", e.deltaY, e.clientX, e.clientY);
+        };
+        element.addEventListener("wheel", handler, { passive: false });
+        element.__profAlanWheel = handler;
+    },
+
+    detachWheelZoom: function (element) {
+        if (element && element.__profAlanWheel) {
+            element.removeEventListener("wheel", element.__profAlanWheel);
+            delete element.__profAlanWheel;
+        }
+    },
+
+    svgScale: function (svg) {
+        var ctm = svg && svg.getScreenCTM ? svg.getScreenCTM() : null;
+        return ctm ? ctm.a : 1;
+    },
+
     scrollIntoView: function (element) {
         if (element) element.scrollIntoView({ block: "nearest", behavior: "smooth" });
     },
