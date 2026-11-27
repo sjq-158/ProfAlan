@@ -1,0 +1,244 @@
+@page "/dashboard"
+@attribute [Authorize]
+@inject AuthSession Auth
+@inject IAutomatonLibrary Library
+@inject IQuizRepository Quizzes
+@inject Notifier Notifier
+
+<PageTitle>Dashboard · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <PageHeader Eyebrow="@($"{Auth.Current?.Role} dashboard")" Title="@($"{Greeting}, {FirstName}")"
+                Subtitle="Pick up where you left off, or start something new.">
+        <Actions>
+            <a href="sandbox" class="btn btn-primary"><Icon Name="flask" /> Open sandbox</a>
+        </Actions>
+    </PageHeader>
+
+    <section class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        @foreach (var (slug, label, icon, caption) in QuickStarts)
+        {
+            <a href="@($"sandbox?kind={slug}")" class="card group flex flex-col gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+                <span class="grid size-9 place-items-center rounded-lg bg-soft transition group-hover:bg-ink group-hover:text-surface"><Icon Name="@icon" /></span>
+                <span>
+                    <span class="block font-medium">@label</span>
+                    <span class="block text-xs text-muted">@caption</span>
+                </span>
+            </a>
+        }
+    </section>
+
+    <section class="mb-8 grid gap-3 sm:grid-cols-3">
+        @Stat("Saved machines", machines?.Count, "folder")
+        @Stat(IsInstructor ? "Problems you wrote" : "Problems solved", IsInstructor ? created.Count : SolvedCount, "checks")
+        @Stat("Recent simulation runs", runs?.Count, "play")
+    </section>
+
+    <div class="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
+        <section class="card">
+            <div class="card-header">
+                <p class="eyebrow">Saved automata</p>
+                <a href="sandbox" class="text-sm text-muted hover:text-ink">New machine</a>
+            </div>
+            @if (machines is null)
+            {
+                <div class="grid h-40 place-items-center text-muted"><Spinner /></div>
+            }
+            else if (machines.Count == 0)
+            {
+                <div class="p-4">
+                    <EmptyState IconName="folder" Title="No saved machines yet" Message="Build something in the sandbox and press Save to keep it here.">
+                        <a href="sandbox?sample=dfa-a-bb" class="btn">Start from an example</a>
+                    </EmptyState>
+                </div>
+            }
+            else
+            {
+                <ul class="divide-y divide-line">
+                    @foreach (var m in machines.Take(8))
+                    {
+                        <li class="flex items-center gap-3 px-4 py-3">
+                            <span class="chip w-12 justify-center">@m.Kind.ShortName()</span>
+                            <div class="min-w-0 flex-1">
+                                <a href="@($"sandbox?id={m.Id}")" class="block truncate font-medium hover:underline">@m.Name</a>
+                                <p class="text-xs text-muted">@m.Definition.States.Count states · @m.Definition.Transitions.Count rules · updated @Ago(m.UpdatedAt)</p>
+                            </div>
+                            @if (pendingDelete == m.Id)
+                            {
+                                <button type="button" class="btn px-2.5 py-1.5 text-xs" @onclick="() => pendingDelete = null">Keep</button>
+                                <button type="button" class="btn btn-danger px-2.5 py-1.5 text-xs" @onclick="() => DeleteMachineAsync(m)">Delete</button>
+                            }
+                            else
+                            {
+                                <a href="@($"sandbox?id={m.Id}")" class="btn px-2.5 py-1.5 text-xs">Open</a>
+                                <button type="button" class="btn-icon size-8 text-fail" aria-label="@($"Delete {m.Name}")" @onclick="() => pendingDelete = m.Id"><Icon Name="trash" Class="size-3.5" /></button>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </section>
+
+        <div class="space-y-6">
+            <section class="card">
+                <div class="card-header">
+                    <p class="eyebrow">@(IsInstructor ? "Your problems" : "Problems for you")</p>
+                    <a href="quizzes" class="text-sm text-muted hover:text-ink">All problems</a>
+                </div>
+                @{
+                    var list = IsInstructor ? created : assigned;
+                }
+                @if (quizzesLoaded && list.Count == 0)
+                {
+                    <p class="px-4 py-5 text-sm text-muted">
+                        @(IsInstructor ? "You have not written a problem yet." : "No published problems yet.")
+                        <a href="@(IsInstructor ? "quizzes/create" : "quizzes")" class="font-medium text-ink underline underline-offset-4">@(IsInstructor ? "Create one" : "Browse the arena")</a>
+                    </p>
+                }
+                <ul class="divide-y divide-line">
+                    @foreach (var q in list.Take(5))
+                    {
+                        var best = Best(q.Id);
+                        <li class="flex items-center gap-3 px-4 py-3">
+                            <div class="min-w-0 flex-1">
+                                <a href="@($"quizzes/{q.Id}/solve")" class="block truncate font-medium hover:underline">@q.Title</a>
+                                <p class="text-xs text-muted">@q.AnswerKind.Label() · @q.TotalCases test cases@(IsInstructor && !q.IsPublished ? " · private" : "")</p>
+                            </div>
+                            @if (best is not null)
+                            {
+                                <span class="@(best.IsPerfect ? "badge-pass" : "badge-muted")">@best.Passed/@best.Total</span>
+                            }
+                            else if (!IsInstructor)
+                            {
+                                <span class="badge-muted">New</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+
+            <section class="card">
+                <div class="card-header"><p class="eyebrow">Recent simulation runs</p></div>
+                @if (runs is { Count: 0 })
+                {
+                    <p class="px-4 py-5 text-sm text-muted">Runs from the step-by-step visualizer appear here while you are signed in.</p>
+                }
+                <ul class="divide-y divide-line">
+                    @foreach (var r in runs ?? [])
+                    {
+                        <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
+                            <span class="chip w-12 justify-center">@r.Kind.ShortName()</span>
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate">@r.MachineName</p>
+                                <p class="truncate font-mono text-xs text-muted">w = @Symbols.Show(r.Input) · @r.Steps steps · @Ago(r.CreatedAt)</p>
+                            </div>
+                            <VerdictBadge Verdict="r.Verdict" />
+                        </li>
+                    }
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly (string Slug, string Label, string Icon, string Caption)[] QuickStarts =
+    [
+        ("dfa", "New DFA", "graph", "δ : K × Σ → K"),
+        ("nfa", "New NFA", "graph", "Δ ⊆ K × Σ* × K"),
+        ("pda", "New PDA", "stack", "with stack Γ"),
+        ("tm", "New TM", "tape", "tape and head"),
+        ("cfg", "Grammar", "grammar", "derivations"),
+        ("regex", "Regex", "regex", "equivalence")
+    ];
+
+    private IReadOnlyList<SavedAutomaton>? machines;
+    private IReadOnlyList<SimulationRun>? runs;
+    private List<Quiz> assigned = [];
+    private List<Quiz> created = [];
+    private IReadOnlyList<Submission> submissions = [];
+    private bool quizzesLoaded;
+    private Guid? pendingDelete;
+
+    private bool IsInstructor => Auth.Current?.Role == UserRole.Instructor;
+    private string FirstName => Auth.Current?.DisplayName.Split(' ')[0] ?? "";
+    private int SolvedCount => submissions.Where(s => s.IsPerfect).Select(s => s.QuizId).Distinct().Count();
+
+    private static string Greeting => DateTime.Now.Hour switch
+    {
+        < 12 => "Good morning",
+        < 18 => "Good afternoon",
+        _ => "Good evening"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var machinesTask = Library.ListAsync();
+            var runsTask = Library.RecentRunsAsync(6);
+            var quizzesTask = Quizzes.ListAsync();
+            var submissionsTask = Quizzes.MySubmissionsAsync();
+
+            machines = await machinesTask;
+            runs = await runsTask;
+            var all = await quizzesTask;
+            submissions = await submissionsTask;
+
+            var me = Auth.Current?.UserId;
+            created = all.Where(q => q.AuthorId is not null && q.AuthorId == me).ToList();
+            assigned = all.Where(q => q.IsPublished && q.AuthorId != me)
+                .OrderBy(q => submissions.Any(s => s.QuizId == q.Id && s.IsPerfect))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            machines ??= [];
+            runs ??= [];
+            Notifier.Error($"Some dashboard data could not be loaded: {ex.Message}");
+        }
+        finally
+        {
+            quizzesLoaded = true;
+        }
+    }
+
+    private Submission? Best(Guid quizId) =>
+        submissions.Where(s => s.QuizId == quizId).OrderByDescending(s => s.Passed * 1.0 / Math.Max(1, s.Total)).FirstOrDefault();
+
+    private RenderFragment Stat(string label, int? value, string icon) => __builder =>
+    {
+        <div class="card flex items-center gap-4 p-4">
+            <span class="grid size-10 place-items-center rounded-lg bg-soft"><Icon Name="@icon" /></span>
+            <div>
+                <p class="font-mono text-2xl font-semibold">@(value?.ToString() ?? "–")</p>
+                <p class="text-xs text-muted">@label</p>
+            </div>
+        </div>
+    };
+
+    private static string Ago(DateTimeOffset when)
+    {
+        var span = DateTimeOffset.UtcNow - when;
+        return span.TotalMinutes < 1 ? "just now"
+            : span.TotalHours < 1 ? $"{(int)span.TotalMinutes} min ago"
+            : span.TotalDays < 1 ? $"{(int)span.TotalHours} h ago"
+            : span.TotalDays < 7 ? $"{(int)span.TotalDays} d ago"
+            : when.ToLocalTime().ToString("MMM d");
+    }
+
+    private async Task DeleteMachineAsync(SavedAutomaton machine)
+    {
+        pendingDelete = null;
+        try
+        {
+            await Library.DeleteAsync(machine.Id);
+            machines = machines!.Where(m => m.Id != machine.Id).ToList();
+            Notifier.Success($"Deleted \"{machine.Name}\".");
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Could not delete: {ex.Message}");
+        }
+    }
+}
