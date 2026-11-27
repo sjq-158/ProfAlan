@@ -1,0 +1,126 @@
+@page "/register"
+@layout BareLayout
+@using System.ComponentModel.DataAnnotations
+@inject AuthSession Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Create account · ProfAlan</PageTitle>
+
+<AuthShell Title="Create your account" Subtitle="Students build and submit machines. Instructors also publish quizzes and review submissions.">
+    @if (confirmationSentTo is not null)
+    {
+        <div class="card p-5">
+            <p class="font-medium">Check your inbox</p>
+            <p class="mt-1 text-sm text-muted">We sent a confirmation link to <span class="font-mono text-ink">@confirmationSentTo</span>. Open it, then sign in.</p>
+            <a href="login" class="btn btn-primary mt-4 w-full">Go to sign in</a>
+        </div>
+    }
+    else
+    {
+        <EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="register" class="flex flex-col gap-4">
+            <DataAnnotationsValidator />
+
+            <fieldset>
+                <legend class="label">I am a</legend>
+                <div class="grid grid-cols-2 gap-2">
+                    @foreach (var role in Enum.GetValues<UserRole>())
+                    {
+                        var selected = form.Role == role;
+                        <button type="button" @onclick="() => form.Role = role"
+                                class="@($"flex flex-col items-start gap-1 rounded-lg border px-3 py-2.5 text-left transition {(selected ? "border-ink bg-card ring-2 ring-ink/15" : "border-line hover:bg-soft")}")"
+                                aria-pressed="@selected">
+                            <Icon Name="@(role == UserRole.Student ? "graduation" : "book")" Class="size-4" />
+                            <span class="text-sm font-medium">@role</span>
+                            <span class="text-xs text-muted">@(role == UserRole.Student ? "Practice and submit" : "Publish and review")</span>
+                        </button>
+                    }
+                </div>
+            </fieldset>
+
+            <div>
+                <label class="label" for="name">Full name</label>
+                <InputText id="name" class="field" @bind-Value="form.DisplayName" autocomplete="name" placeholder="Alan Turing" />
+                <ValidationMessage For="() => form.DisplayName" class="mt-1 text-xs text-fail" />
+            </div>
+
+            <div>
+                <label class="label" for="email">Email</label>
+                <InputText id="email" type="email" class="field" @bind-Value="form.Email" autocomplete="email" placeholder="you@school.edu" />
+                <ValidationMessage For="() => form.Email" class="mt-1 text-xs text-fail" />
+            </div>
+
+            <div>
+                <label class="label" for="password">Password</label>
+                <InputText id="password" type="password" class="field" @bind-Value="form.Password" autocomplete="new-password" />
+                <p class="mt-1 text-xs text-muted">At least 8 characters.</p>
+                <ValidationMessage For="() => form.Password" class="mt-1 text-xs text-fail" />
+            </div>
+
+            @if (error is not null)
+            {
+                <p class="flex items-start gap-2 rounded-lg border border-fail/30 bg-fail/10 px-3 py-2 text-sm text-fail">
+                    <Icon Name="alert" Class="mt-0.5 size-4" /> @error
+                </p>
+            }
+
+            <button type="submit" class="btn btn-primary mt-1 w-full py-2.5" disabled="@busy">
+                @if (busy)
+                {
+                    <Spinner />
+                }
+                Create account
+            </button>
+        </EditForm>
+
+        <p class="mt-6 text-center text-sm text-muted">
+            Already registered? <a href="login" class="font-medium text-ink underline underline-offset-4">Sign in</a>
+        </p>
+    }
+</AuthShell>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private readonly RegisterForm form = new();
+    private bool busy;
+    private string? error;
+    private string? confirmationSentTo;
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        error = null;
+        var outcome = await Auth.SignUpAsync(form.Email, form.Password, form.DisplayName, form.Role);
+        busy = false;
+
+        if (outcome.Error is not null)
+        {
+            error = outcome.Error;
+        }
+        else if (outcome.NeedsConfirmation)
+        {
+            confirmationSentTo = form.Email;
+        }
+        else
+        {
+            Navigation.NavigateTo(Login.SafeReturnUrl(ReturnUrl));
+        }
+    }
+
+    private sealed class RegisterForm
+    {
+        public UserRole Role { get; set; } = UserRole.Student;
+
+        [Required(ErrorMessage = "Enter your name.")]
+        [StringLength(80)]
+        public string DisplayName { get; set; } = "";
+
+        [Required(ErrorMessage = "Enter your email.")]
+        [EmailAddress(ErrorMessage = "That does not look like an email address.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Choose a password.")]
+        [MinLength(8, ErrorMessage = "Use at least 8 characters.")]
+        public string Password { get; set; } = "";
+    }
+}

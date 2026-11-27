@@ -1,0 +1,90 @@
+@page "/login"
+@layout BareLayout
+@inject AuthSession Auth
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · ProfAlan</PageTitle>
+
+<AuthShell Title="Welcome back" Subtitle="Sign in to continue to your automata, quizzes and runs.">
+    <EditForm Model="form" OnValidSubmit="SubmitAsync" FormName="login" class="flex flex-col gap-4">
+        <DataAnnotationsValidator />
+
+        <div>
+            <label class="label" for="email">Email</label>
+            <InputText id="email" type="email" class="field" @bind-Value="form.Email" autocomplete="email" placeholder="you@school.edu" />
+            <ValidationMessage For="() => form.Email" class="mt-1 text-xs text-fail" />
+        </div>
+
+        <div>
+            <label class="label" for="password">Password</label>
+            <div class="relative">
+                <InputText id="password" type="@(showPassword ? "text" : "password")" class="field pr-10" @bind-Value="form.Password" autocomplete="current-password" />
+                <button type="button" class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-ink"
+                        aria-label="@(showPassword ? "Hide password" : "Show password")" @onclick="() => showPassword = !showPassword">
+                    <Icon Name="@(showPassword ? "eye-off" : "eye")" />
+                </button>
+            </div>
+            <ValidationMessage For="() => form.Password" class="mt-1 text-xs text-fail" />
+        </div>
+
+        @if (error is not null)
+        {
+            <p class="flex items-start gap-2 rounded-lg border border-fail/30 bg-fail/10 px-3 py-2 text-sm text-fail">
+                <Icon Name="alert" Class="mt-0.5 size-4" /> @error
+            </p>
+        }
+
+        <button type="submit" class="btn btn-primary mt-1 w-full py-2.5" disabled="@busy">
+            @if (busy)
+            {
+                <Spinner />
+            }
+            Sign in
+        </button>
+    </EditForm>
+
+    <p class="mt-6 text-center text-sm text-muted">
+        New to ProfAlan? <a href="@RegisterHref" class="font-medium text-ink underline underline-offset-4">Create an account</a>
+    </p>
+</AuthShell>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+
+    private readonly LoginForm form = new();
+    private bool busy;
+    private bool showPassword;
+    private string? error;
+
+    private string RegisterHref => string.IsNullOrEmpty(ReturnUrl) ? "register" : $"register?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    private async Task SubmitAsync()
+    {
+        busy = true;
+        error = null;
+        var outcome = await Auth.SignInAsync(form.Email, form.Password);
+        busy = false;
+
+        if (outcome.Session is null)
+        {
+            error = outcome.Error ?? "Sign in failed.";
+            return;
+        }
+        Navigation.NavigateTo(SafeReturnUrl(ReturnUrl));
+    }
+
+    internal static string SafeReturnUrl(string? url) =>
+        string.IsNullOrWhiteSpace(url) || url.Contains("://") || url.StartsWith("//") || url.StartsWith("login") || url.StartsWith("register")
+            ? "dashboard"
+            : url;
+
+    private sealed class LoginForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Enter your email.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "That does not look like an email address.")]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Enter your password.")]
+        public string Password { get; set; } = "";
+    }
+}
