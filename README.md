@@ -37,9 +37,14 @@ Formal conventions in the engines:
 Prerequisites: .NET 10 SDK and Node.js 20+.
 
 ```bash
+cd ProfAlan        # run commands from the folder that contains ProfAlan.csproj
 npm install        # Tailwind CLI; the build also runs this if node_modules is missing
 dotnet watch       # builds the CSS, then serves http://localhost:5039
 ```
+
+From a parent folder, pass the project explicitly: `dotnet watch --project ProfAlan/ProfAlan.csproj`.
+In VS Code, press **F5** (configuration "ProfAlan (run and open browser)") or run the default build
+task **ProfAlan: run with hot reload** (Ctrl+Shift+B).
 
 Without Supabase settings the app runs in **demo mode**: accounts, saved machines, quizzes and
 submissions are kept in the browser's localStorage, and five starter problems are seeded.

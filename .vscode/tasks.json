@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ProfAlan: run with hot reload",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["watch", "--project", "${workspaceFolder}/ProfAlan.csproj"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "ProfAlan: run tests",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["test", "${workspaceFolder}/tests/ProfAlan.Tests/ProfAlan.Tests.csproj"],
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    }
+  ]
+}

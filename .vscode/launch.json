@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ProfAlan (run and open browser)",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/ProfAlan.csproj"
+    }
+  ]
+}
