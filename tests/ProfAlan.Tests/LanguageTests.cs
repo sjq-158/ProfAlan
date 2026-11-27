@@ -103,3 +103,14 @@ public class GrammarTests
         Assert.Throws<GrammarSyntaxException>(() => ContextFreeGrammar.Parse("aS -> b"));
     }
 }
+
+public class RegexPrintingTests
+{
+    [Theory]
+    [InlineData("a(a+b)*bb", "a(a ∪ b)*bb")]
+    [InlineData("(ab)*", "(ab)*")]
+    public void Prints_in_textbook_notation(string input, string expected)
+    {
+        Assert.Equal(expected, RegexParser.Parse(input).ToString());
+    }
+}

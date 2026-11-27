@@ -19,7 +19,7 @@ public abstract record RegexNode
         _ => []
     };
 
-    public override string ToString() => this switch
+    public sealed override string ToString() => this switch
     {
         EmptySet => "∅",
         EmptyString => "e",
