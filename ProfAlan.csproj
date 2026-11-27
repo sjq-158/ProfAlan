@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>ProfAlan</RootNamespace>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests/**;node_modules/**;supabase/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
