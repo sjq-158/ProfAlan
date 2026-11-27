@@ -40,19 +40,18 @@ npm install        # Tailwind CLI; the build also runs this if node_modules is m
 dotnet watch       # builds the CSS, then serves http://localhost:5039
 ```
 
-With an empty `wwwroot/appsettings.json` the app runs in **demo mode**: accounts, saved
-machines, quizzes and submissions are kept in the browser's localStorage, and five starter
-problems are seeded. That is enough to try the whole student and instructor loop on one machine.
+Without Supabase settings the app runs in **demo mode**: accounts, saved machines, quizzes and
+submissions are kept in the browser's localStorage, and five starter problems are seeded.
 
 ### Connecting Supabase
 
-1. Create a Supabase project.
-2. Run [`supabase/migrations/20261127000000_profalan_schema.sql`](supabase/migrations/20261127000000_profalan_schema.sql), then optionally [`supabase/seed.sql`](supabase/seed.sql), in the SQL editor (or use `supabase db push`).
-3. Put the project URL and anon key in `wwwroot/appsettings.json`:
+Settings are never committed. Each build runs `scripts/write-config.mjs`, which writes the
+git-ignored `wwwroot/appsettings.json` from environment variables or from a local `.env` file.
 
-   ```json
-   { "Supabase": { "Url": "https://YOUR-PROJECT.supabase.co", "AnonKey": "YOUR-ANON-KEY" } }
-   ```
+1. Copy `.env.example` to `.env`, then fill in `SUPABASE_URL` and `SUPABASE_ANON_KEY`. Find both in the dashboard under **Project Settings → API Keys**. Either the legacy anon key or the newer publishable key works. On a host such as Vercel or Netlify, set the same two variables in the build environment instead.
+2. Open **SQL Editor** in the dashboard and run [`supabase/migrations/20261127000000_profalan_schema.sql`](supabase/migrations/20261127000000_profalan_schema.sql). Then run [`supabase/seed.sql`](supabase/seed.sql) for the starter problems. With the Supabase CLI you can instead run `npx supabase link --project-ref <ref>` and then `npx supabase db push`.
+3. Under **Authentication → URL Configuration**, add your app origins (for example `http://localhost:5039/**` and your deployed URL) to the Redirect URLs. Confirmation emails link back to `/login`, which signs the user in automatically.
+4. Run `dotnet watch`. The build log prints which mode was configured.
 
 The anon key is public by design. Row level security protects the data:
 

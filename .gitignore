@@ -483,3 +483,7 @@ $RECYCLE.BIN/
 
 node_modules/
 wwwroot/css/app.css
+
+# Local configuration; appsettings.json is generated from .env by scripts/write-config.mjs
+.env
+wwwroot/appsettings.json

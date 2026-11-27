@@ -17,6 +17,9 @@
   <Target Name="TailwindInstall" BeforeTargets="BeforeBuild" Condition="!Exists('node_modules')">
     <Exec Command="npm install" />
   </Target>
+  <Target Name="WriteAppSettings" BeforeTargets="BeforeBuild">
+    <Exec Command="node scripts/write-config.mjs" />
+  </Target>
   <Target Name="TailwindBuild" BeforeTargets="BeforeBuild" DependsOnTargets="TailwindInstall">
     <Exec Command="npm run css:build" />
   </Target>
