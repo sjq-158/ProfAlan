@@ -9,43 +9,36 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <link rel="stylesheet" href="css/app.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
 
     <script>
-        // apply the saved theme before first paint (no flash)
+        // Apply the saved palette before first paint so the page never flashes the default colors.
         (function () {
-            if (localStorage.getItem("profalan-theme") === "dark") {
-                document.documentElement.classList.add("dark");
-            }
+            try {
+                var palette = localStorage.getItem("profalan.palette");
+                if (palette) document.documentElement.setAttribute("data-palette", palette);
+            } catch (e) { }
         })();
-
-        window.profAlanTheme = {
-            isDark: function () {
-                return document.documentElement.classList.contains("dark");
-            },
-            toggle: function () {
-                var dark = document.documentElement.classList.toggle("dark");
-                localStorage.setItem("profalan-theme", dark ? "dark" : "light");
-                return dark;
-            }
-        };
     </script>
-
-    <script type="importmap"></script>
+    <script src="js/profalan.js"></script>
 </head>
 
 <body>
     <div id="app">
-        <div class="flex h-screen items-center justify-center font-mono text-sm text-neutral-500">Loading…</div>
+        <div style="display:grid;place-items:center;height:100vh;font-family:'Fira Code',monospace;font-size:13px;opacity:.6">
+            Loading ProfAlan
+        </div>
     </div>
 
     <div id="blazor-error-ui">
-        An unhandled error has occurred.
+        Something went wrong while rendering this page.
         <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+        <span class="dismiss" aria-label="Dismiss">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
+        </span>
     </div>
 
     <script src="_framework/blazor.webassembly.js"></script>

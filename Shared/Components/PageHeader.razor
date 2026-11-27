@@ -1,0 +1,32 @@
+<header class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div class="min-w-0">
+        @if (BackHref is not null)
+        {
+            <a href="@BackHref" class="mb-3 inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink">
+                <Icon Name="arrow-left" /> @BackLabel
+            </a>
+        }
+        @if (Eyebrow is not null)
+        {
+            <p class="eyebrow mb-2">@Eyebrow</p>
+        }
+        <h1 class="font-display text-3xl sm:text-4xl">@Title</h1>
+        @if (Subtitle is not null)
+        {
+            <p class="mt-2 max-w-2xl text-muted">@Subtitle</p>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="flex flex-wrap items-center gap-2">@Actions</div>
+    }
+</header>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Eyebrow { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string? BackHref { get; set; }
+    [Parameter] public string BackLabel { get; set; } = "Back";
+    [Parameter] public RenderFragment? Actions { get; set; }
+}

@@ -1,0 +1,39 @@
+@implements IDisposable
+@inject Notifier Notifier
+
+<div class="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
+    @foreach (var notice in Notifier.Notices)
+    {
+        <div class="card pointer-events-auto flex items-start gap-3 px-4 py-3 text-sm shadow-lg">
+            <span class="@($"mt-0.5 {ToneClass(notice.Tone)}")">
+                <Icon Name="@IconFor(notice.Tone)" />
+            </span>
+            <p class="flex-1">@notice.Message</p>
+            <button type="button" class="text-muted hover:text-ink" aria-label="Dismiss" @onclick="() => Notifier.Dismiss(notice.Id)">
+                <Icon Name="x" />
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Notifier.Changed += OnChanged;
+
+    private static string ToneClass(NoticeTone tone) => tone switch
+    {
+        NoticeTone.Success => "text-pass",
+        NoticeTone.Error => "text-fail",
+        _ => "text-ink"
+    };
+
+    private static string IconFor(NoticeTone tone) => tone switch
+    {
+        NoticeTone.Success => "check",
+        NoticeTone.Error => "alert",
+        _ => "info"
+    };
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Notifier.Changed -= OnChanged;
+}

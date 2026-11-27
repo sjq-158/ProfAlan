@@ -1,0 +1,53 @@
+@implements IDisposable
+@inject PaletteService Palettes
+
+<div class="relative">
+    <button type="button" class="btn-icon" aria-label="Change color theme" title="Color theme" @onclick="() => open = !open">
+        <Icon Name="palette" />
+    </button>
+
+    @if (open)
+    {
+        <div class="fixed inset-0 z-40" @onclick="() => open = false"></div>
+        <div class="card absolute right-0 z-50 mt-2 w-72 p-2 shadow-lg">
+            <p class="eyebrow px-2 pb-2 pt-1">Color theme</p>
+            @foreach (var palette in PaletteService.All)
+            {
+                var active = palette.Id == Palettes.Current;
+                <button type="button" @onclick="() => ChooseAsync(palette.Id)"
+                        class="@($"flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition hover:bg-soft {(active ? "bg-soft" : "")}")">
+                    <span class="flex overflow-hidden rounded-md border border-line">
+                        <span class="size-5" style="background:@palette.Surface"></span>
+                        <span class="size-5" style="background:@palette.Panel"></span>
+                        <span class="size-5" style="background:@palette.Ink"></span>
+                    </span>
+                    <span class="flex-1">@palette.Name</span>
+                    @if (active)
+                    {
+                        <Icon Name="check" />
+                    }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private bool open;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Palettes.Changed += OnChanged;
+        await Palettes.InitializeAsync();
+    }
+
+    private async Task ChooseAsync(string id)
+    {
+        await Palettes.ApplyAsync(id);
+        open = false;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Palettes.Changed -= OnChanged;
+}
