@@ -1,12 +1,13 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Components;
 using ProfAlan.Features.Auth.Models;
 using ProfAlan.Shared.Supabase;
 
 namespace ProfAlan.Features.Auth.Services;
 
 /// <summary>Talks to Supabase Auth (GoTrue) over its REST endpoints.</summary>
-public sealed class SupabaseAuthGateway(HttpClient http, SupabaseOptions options) : IAuthGateway
+public sealed class SupabaseAuthGateway(HttpClient http, SupabaseOptions options, NavigationManager navigation) : IAuthGateway
 {
     public bool IsDemo => false;
 
@@ -15,7 +16,9 @@ public sealed class SupabaseAuthGateway(HttpClient http, SupabaseOptions options
 
     public async Task<AuthOutcome> SignUpAsync(string email, string password, string displayName, UserRole role)
     {
-        var outcome = await PostAsync("signup", new
+        // Confirmation links return to wherever this app is running, so no site URL is hardcoded.
+        var redirect = Uri.EscapeDataString($"{navigation.BaseUri}login");
+        var outcome = await PostAsync($"signup?redirect_to={redirect}", new
         {
             email,
             password,
@@ -42,6 +45,26 @@ public sealed class SupabaseAuthGateway(HttpClient http, SupabaseOptions options
         catch (HttpRequestException)
         {
             // Signing out locally still succeeds; the token simply expires on its own.
+        }
+    }
+
+    public async Task<UserSession?> SessionFromRedirectAsync(string accessToken, string refreshToken, int expiresIn)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, Endpoint("user"));
+        request.Headers.Add("apikey", options.AnonKey);
+        request.Headers.Authorization = new("Bearer", accessToken);
+        try
+        {
+            using var response = await http.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return null;
+            using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var json = $$"""{"access_token":{{JsonSerializer.Serialize(accessToken)}},"refresh_token":{{JsonSerializer.Serialize(refreshToken)}},"expires_in":{{expiresIn}},"user":{{doc.RootElement.GetRawText()}}}""";
+            using var session = JsonDocument.Parse(json);
+            return ReadSession(session.RootElement);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
         }
     }
 

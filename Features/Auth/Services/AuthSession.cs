@@ -38,6 +38,14 @@ public sealed class AuthSession(IAuthGateway gateway, BrowserStorage storage)
         return outcome;
     }
 
+    public async Task<bool> CompleteRedirectAsync(string accessToken, string refreshToken, int expiresIn)
+    {
+        var session = await gateway.SessionFromRedirectAsync(accessToken, refreshToken, expiresIn);
+        if (session is null) return false;
+        await SetAsync(session);
+        return true;
+    }
+
     public async Task SignOutAsync()
     {
         if (current is not null) await gateway.SignOutAsync(current);

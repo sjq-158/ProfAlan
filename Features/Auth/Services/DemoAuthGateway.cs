@@ -48,6 +48,9 @@ public sealed class DemoAuthGateway(BrowserStorage storage) : IAuthGateway
 
     public Task SignOutAsync(UserSession session) => Task.CompletedTask;
 
+    public Task<UserSession?> SessionFromRedirectAsync(string accessToken, string refreshToken, int expiresIn) =>
+        Task.FromResult<UserSession?>(null);
+
     private async Task<List<DemoAccount>> LoadAsync() =>
         await storage.GetJsonAsync<List<DemoAccount>>(AccountsKey) ?? [];
 

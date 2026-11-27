@@ -56,6 +56,21 @@
     private bool showPassword;
     private string? error;
 
+    protected override async Task OnInitializedAsync()
+    {
+        var fragment = new Uri(Navigation.Uri).Fragment.TrimStart('#');
+        if (!fragment.Contains("access_token=")) return;
+
+        var values = fragment.Split('&').Select(p => p.Split('=', 2)).Where(p => p.Length == 2)
+            .ToDictionary(p => p[0], p => Uri.UnescapeDataString(p[1]));
+        busy = true;
+        var ok = await Auth.CompleteRedirectAsync(values.GetValueOrDefault("access_token", ""), values.GetValueOrDefault("refresh_token", ""),
+            int.TryParse(values.GetValueOrDefault("expires_in"), out var seconds) ? seconds : 3600);
+        busy = false;
+        if (ok) Navigation.NavigateTo("dashboard", replace: true);
+        else error = "That confirmation link has expired. Sign in with your email and password.";
+    }
+
     private string RegisterHref => string.IsNullOrEmpty(ReturnUrl) ? "register" : $"register?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
 
     private async Task SubmitAsync()

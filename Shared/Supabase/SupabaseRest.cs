@@ -49,7 +49,8 @@ public sealed class SupabaseRest(HttpClient http, SupabaseOptions options, IAcce
     {
         using var request = new HttpRequestMessage(method, $"{options.Url.TrimEnd('/')}/rest/v1/{path}");
         request.Headers.Add("apikey", options.AnonKey);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await tokens.GetAccessTokenAsync() ?? options.AnonKey);
+        // Publishable keys are not JWTs, so a Bearer header is sent only for a signed-in user's token.
+        if (await tokens.GetAccessTokenAsync() is { } token) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         if (prefer is not null) request.Headers.Add("Prefer", prefer);
         if (body is not null) request.Content = JsonContent.Create(body, options: Json);
 
