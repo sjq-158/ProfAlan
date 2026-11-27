@@ -1,0 +1,46 @@
+@* The synchronized graphical and tabular builders over one Automaton. *@
+<section class="card flex flex-col overflow-hidden">
+    <div class="card-header py-2">
+        <div class="flex items-center gap-1 rounded-lg bg-soft p-0.5" role="tablist" aria-label="Construction mode">
+            @ViewTab(BuilderView.Diagram, "graph", "Graphical")
+            @ViewTab(BuilderView.Table, "table", "Tabular")
+            @ViewTab(BuilderView.Split, "split", "Both")
+        </div>
+        <span class="hidden font-mono text-xs text-muted sm:inline">@Machine.States.Count states · @Machine.Transitions.Count rules</span>
+    </div>
+
+    <div class="@($"grid min-h-0 {(view == BuilderView.Split ? "xl:grid-cols-[1.4fr_1fr]" : "")}")">
+        @if (view != BuilderView.Table)
+        {
+            <div class="grid-paper h-[30rem] bg-card/40 @(view == BuilderView.Split ? "border-b border-line xl:border-b-0 xl:border-r" : "")">
+                <StateDiagram Machine="Machine" ActiveState="@ActiveState" ActiveRuleId="@ActiveRuleId" Outcome="Outcome" OnChanged="OnChanged" />
+            </div>
+        }
+        @if (view != BuilderView.Diagram)
+        {
+            <div class="@(view == BuilderView.Split ? "h-[30rem]" : "max-h-[36rem]")">
+                <TransitionGrid Machine="Machine" OnChanged="OnChanged" />
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public string? ActiveState { get; set; }
+    [Parameter] public string? ActiveRuleId { get; set; }
+    [Parameter] public Verdict? Outcome { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private enum BuilderView { Diagram, Table, Split }
+
+    private BuilderView view = BuilderView.Diagram;
+
+    private RenderFragment ViewTab(BuilderView value, string icon, string label) => __builder =>
+    {
+        <button type="button" role="tab" aria-selected="@(view == value)" @onclick="() => view = value"
+                class="@($"tab flex items-center gap-1.5 px-2.5 py-1 {(view == value ? "tab-active" : "")}")">
+            <Icon Name="@icon" Class="size-3.5" /> <span class="hidden sm:inline">@label</span>
+        </button>
+    };
+}

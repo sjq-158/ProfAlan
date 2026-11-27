@@ -1,0 +1,269 @@
+<div class="flex h-full flex-col gap-5 overflow-y-auto p-4 text-sm">
+    <section>
+        <div class="mb-2 flex items-center justify-between">
+            <p class="eyebrow">States K</p>
+            <button type="button" class="btn px-2.5 py-1" @onclick="AddStateAsync"><Icon Name="plus" /> State</button>
+        </div>
+        <div class="overflow-x-auto rounded-lg border border-line">
+            <table class="w-full min-w-[26rem] text-left">
+                <thead class="bg-soft text-xs text-muted">
+                    <tr>
+                        <th class="px-3 py-2 font-medium">Name</th>
+                        <th class="px-3 py-2 text-center font-medium">Initial</th>
+                        @if (Machine.Kind == MachineKind.Turing)
+                        {
+                            <th class="px-3 py-2 text-center font-medium">Halting</th>
+                            <th class="px-3 py-2 text-center font-medium">Accepting (y)</th>
+                        }
+                        else
+                        {
+                            <th class="px-3 py-2 text-center font-medium">Final</th>
+                        }
+                        <th class="w-10"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Machine.States)
+                    {
+                        <tr class="border-t border-line">
+                            <td class="px-3 py-1.5">
+                                <input class="field field-mono py-1" value="@s.Name" aria-label="State name" @onchange="e => RenameAsync(s, e.Value?.ToString())" />
+                            </td>
+                            <td class="px-3 text-center">
+                                <input type="radio" name="@($"{id}-initial")" class="size-4 accent-[var(--pa-ink)]" checked="@s.IsInitial" aria-label="Initial state"
+                                       @onchange="() => ChangeAsync(() => Machine.MakeInitial(s))" />
+                            </td>
+                            @if (Machine.Kind == MachineKind.Turing)
+                            {
+                                <td class="px-3 text-center">
+                                    <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@s.IsHalting" aria-label="Halting state"
+                                           @onchange="e => SetHaltingAsync(s, (bool)e.Value!)" />
+                                </td>
+                                <td class="px-3 text-center">
+                                    <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@s.IsFinal" disabled="@(!s.IsHalting)" aria-label="Accepting halting state"
+                                           @onchange="e => ChangeAsync(() => s.IsFinal = (bool)e.Value!)" />
+                                </td>
+                            }
+                            else
+                            {
+                                <td class="px-3 text-center">
+                                    <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@s.IsFinal" aria-label="Final state"
+                                           @onchange="e => ChangeAsync(() => s.IsFinal = (bool)e.Value!)" />
+                                </td>
+                            }
+                            <td class="pr-2 text-right">
+                                <button type="button" class="grid size-7 place-items-center rounded-md text-fail hover:bg-fail/10" aria-label="@($"Delete {s.Name}")"
+                                        @onclick="() => ChangeAsync(() => Machine.RemoveState(s))">
+                                    <Icon Name="trash" Class="size-3.5" />
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        @if (renameError is not null)
+        {
+            <p class="mt-1.5 text-xs text-fail">@renameError</p>
+        }
+    </section>
+
+    <section>
+        <div class="mb-2 flex items-center justify-between">
+            <p class="eyebrow">@TableTitle</p>
+            @if (Machine.Kind != MachineKind.Dfa)
+            {
+                <button type="button" class="btn px-2.5 py-1" disabled="@(Machine.States.Count == 0)" @onclick="AddRuleAsync"><Icon Name="plus" /> Rule</button>
+            }
+        </div>
+
+        @if (Machine.States.Count == 0)
+        {
+            <p class="rounded-lg border border-dashed border-line px-3 py-6 text-center text-muted">Add a state to start filling in the table.</p>
+        }
+        else if (Machine.Kind == MachineKind.Dfa)
+        {
+            <div class="overflow-x-auto rounded-lg border border-line">
+                <table class="w-full min-w-[22rem] text-left font-mono">
+                    <thead class="bg-soft font-sans text-xs text-muted">
+                        <tr>
+                            <th class="px-3 py-2 font-medium">q</th>
+                            <th class="px-3 py-2 font-medium">σ</th>
+                            <th class="px-3 py-2 font-medium">δ(q, σ)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var q in Machine.States)
+                        {
+                            @for (var i = 0; i < Machine.Alphabet.Count; i++)
+                            {
+                                var a = Machine.Alphabet[i].ToString();
+                                var target = Machine.Transitions.FirstOrDefault(t => t.From == q.Name && t.Read == a)?.To ?? "";
+                                <tr class="@($"border-line {(i == 0 ? "border-t" : "")}")">
+                                    <td class="px-3 py-1">@(i == 0 ? StateLabel(q) : "")</td>
+                                    <td class="px-3 py-1">@a</td>
+                                    <td class="px-3 py-1">
+                                        <select class="@($"field field-mono py-1 {(target == "" ? "border-fail/60 text-fail" : "")}")" value="@target"
+                                                aria-label="@($"δ({q.Name}, {a})")" @onchange="e => SetDfaTargetAsync(q.Name, a, e.Value?.ToString())">
+                                            <option value="">undefined</option>
+                                            @foreach (var p in Machine.States)
+                                            {
+                                                <option value="@p.Name">@p.Name</option>
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (Machine.Alphabet.Count == 0)
+            {
+                <p class="mt-2 text-xs text-muted">Declare Σ in the definition panel to generate the rows.</p>
+            }
+        }
+        else
+        {
+            <div class="overflow-x-auto rounded-lg border border-line">
+                <table class="w-full min-w-[30rem] text-left font-mono">
+                    <thead class="bg-soft font-sans text-xs text-muted">
+                        <tr>
+                            @foreach (var heading in Headings)
+                            {
+                                <th class="px-2 py-2 font-medium">@heading</th>
+                            }
+                            <th class="w-9"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in Machine.Transitions)
+                        {
+                            <tr class="border-t border-line">
+                                <td class="px-2 py-1">@StateSelect(rule.From, v => rule.From = v)</td>
+                                @switch (Machine.Kind)
+                                {
+                                    case MachineKind.Nfa:
+                                        <td class="px-2 py-1">@TextCell(Symbols.Show(rule.Read), v => rule.Read = Symbols.Normalize(v), "u")</td>
+                                        <td class="px-2 py-1">@StateSelect(rule.To, v => rule.To = v)</td>
+                                        break;
+                                    case MachineKind.Pda:
+                                        <td class="px-2 py-1">@TextCell(Symbols.Show(rule.Read), v => rule.Read = Symbols.Normalize(v), "a")</td>
+                                        <td class="px-2 py-1">@TextCell(Symbols.Show(rule.Pop), v => rule.Pop = Symbols.Normalize(v), "β")</td>
+                                        <td class="px-2 py-1">@StateSelect(rule.To, v => rule.To = v)</td>
+                                        <td class="px-2 py-1">@TextCell(Symbols.Show(rule.Push), v => rule.Push = Symbols.Normalize(v), "γ")</td>
+                                        break;
+                                    case MachineKind.Turing:
+                                        <td class="px-2 py-1">@TextCell(rule.Read, v => rule.Read = string.IsNullOrWhiteSpace(v) ? Symbols.Blank.ToString() : Symbols.NormalizeTapeSymbol(v.Trim()[0]).ToString(), "σ")</td>
+                                        <td class="px-2 py-1">@StateSelect(rule.To, v => rule.To = v)</td>
+                                        <td class="px-2 py-1">@TextCell(rule.Action, v => rule.Action = Symbols.NormalizeAction(v), "b")</td>
+                                        break;
+                                }
+                                <td class="pr-1.5 text-right">
+                                    <button type="button" class="grid size-7 place-items-center rounded-md text-fail hover:bg-fail/10" aria-label="Delete rule"
+                                            @onclick="() => ChangeAsync(() => Machine.Transitions.Remove(rule))">
+                                        <Icon Name="trash" Class="size-3.5" />
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                @if (Machine.Transitions.Count == 0)
+                {
+                    <p class="px-3 py-5 text-center font-sans text-muted">No rules yet. Add one with the button above.</p>
+                }
+            </div>
+            <p class="mt-2 text-xs text-muted">@Footnote</p>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly string id = Guid.NewGuid().ToString("N")[..8];
+    private string? renameError;
+
+    private string TableTitle => Machine.Kind switch
+    {
+        MachineKind.Dfa => "Transition function δ : K × Σ → K",
+        MachineKind.Nfa => "Transition relation Δ ⊆ K × Σ* × K",
+        MachineKind.Pda => "Transition relation Δ",
+        _ => "Transition function δ : (K − H) × Σ → K × (Σ ∪ {←, →})"
+    };
+
+    private string[] Headings => Machine.Kind switch
+    {
+        MachineKind.Nfa => ["q", "u", "p"],
+        MachineKind.Pda => ["p", "a", "β", "q", "γ"],
+        _ => ["q", "σ", "p", "b"]
+    };
+
+    private string Footnote => Machine.Kind switch
+    {
+        MachineKind.Nfa => "Each row is a triple (q, u, p). Write e for the empty string.",
+        MachineKind.Pda => "Each row is ((p, a, β), (q, γ)). Write e for the empty string; the stack top is the leftmost symbol.",
+        _ => "Each row is δ(q, σ) = (p, b) where b is a symbol to write or a move. Type _ for ⊔, L for ←, R for →."
+    };
+
+    private static string StateLabel(StateNode q) => $"{(q.IsInitial ? "→ " : "")}{q.Name}{(q.IsFinal ? " *" : "")}";
+
+    private RenderFragment StateSelect(string value, Action<string> set) => __builder =>
+    {
+        <select class="field field-mono min-w-20 px-2 py-1" value="@value" @onchange="e => ChangeAsync(() => set(e.Value?.ToString() ?? value))">
+            @foreach (var s in Machine.States)
+            {
+                <option value="@s.Name">@s.Name</option>
+            }
+        </select>
+    };
+
+    private RenderFragment TextCell(string value, Action<string> set, string placeholder) => __builder =>
+    {
+        <input class="field field-mono min-w-14 px-2 py-1" value="@value" placeholder="@placeholder" aria-label="@placeholder"
+               @onchange="e => ChangeAsync(() => set(e.Value?.ToString() ?? string.Empty))" />
+    };
+
+    private async Task ChangeAsync(Action change)
+    {
+        change();
+        await OnChanged.InvokeAsync();
+    }
+
+    private Task SetHaltingAsync(StateNode s, bool halting) => ChangeAsync(() =>
+    {
+        s.IsHalting = halting;
+        if (!halting) s.IsFinal = false;
+    });
+
+    private async Task RenameAsync(StateNode s, string? name)
+    {
+        renameError = Machine.RenameState(s, name ?? "") ? null : "State names must be unique and not empty.";
+        await OnChanged.InvokeAsync();
+    }
+
+    private Task AddStateAsync()
+    {
+        var x = Machine.States.Count == 0 ? 140 : Math.Min(Machine.States.Max(s => s.X) + 160, DiagramGeometry.Width - 60);
+        return ChangeAsync(() => Machine.AddState(x, 260));
+    }
+
+    private Task SetDfaTargetAsync(string from, string symbol, string? to) => ChangeAsync(() =>
+    {
+        Machine.Transitions.RemoveAll(t => t.From == from && t.Read == symbol);
+        if (!string.IsNullOrEmpty(to)) Machine.Transitions.Add(new TransitionRule { From = from, To = to, Read = symbol });
+    });
+
+    private Task AddRuleAsync()
+    {
+        var first = Machine.InitialState?.Name ?? Machine.States[0].Name;
+        var rule = Machine.Kind switch
+        {
+            MachineKind.Turing => new TransitionRule { From = first, To = first, Read = Symbols.Blank.ToString(), Action = Symbols.MoveRight },
+            _ => new TransitionRule { From = first, To = first, Read = Machine.Alphabet.Count > 0 ? Machine.Alphabet[0].ToString() : "" }
+        };
+        return ChangeAsync(() => Machine.Transitions.Add(rule));
+    }
+}
