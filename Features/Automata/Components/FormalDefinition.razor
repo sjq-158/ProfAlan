@@ -25,7 +25,9 @@
             @if (Machine.Kind == MachineKind.Turing)
             {
                 <dt class="text-muted">H</dt>
-                <dd class="break-words">@Set(Machine.States.Where(s => s.IsHalting).Select(s => s.IsFinal ? $"{s.Name} (y)" : s.Name))</dd>
+                <dd class="break-words">@Set(Machine.States.Where(s => s.IsHalting).Select(s => s.Name))</dd>
+                <dt class="text-muted">y</dt>
+                <dd class="break-words">@(Machine.States.FirstOrDefault(s => s.IsHalting && s.IsFinal)?.Name is { } y ? $"{y} accepts, other halting states reject" : "none marked, so halting means acceptance")</dd>
             }
             else
             {

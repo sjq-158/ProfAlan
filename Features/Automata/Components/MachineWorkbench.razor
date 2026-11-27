@@ -12,7 +12,7 @@
     <div class="@($"grid min-h-0 {(view == BuilderView.Split ? "xl:grid-cols-[1.4fr_1fr]" : "")}")">
         @if (view != BuilderView.Table)
         {
-            <div class="grid-paper h-[30rem] bg-card/40 @(view == BuilderView.Split ? "border-b border-line xl:border-b-0 xl:border-r" : "")">
+            <div class="grid-paper h-[20rem] bg-card/40 sm:h-[30rem] @(view == BuilderView.Split ? "border-b border-line xl:border-b-0 xl:border-r" : "")">
                 <StateDiagram Machine="Machine" ActiveState="@ActiveState" ActiveRuleId="@ActiveRuleId" Outcome="Outcome" OnChanged="OnChanged" />
             </div>
         }
