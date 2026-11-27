@@ -66,12 +66,18 @@ The anon key is public by design. Row level security protects the data:
 - Hidden test cases can be read only by the quiz author. Solvers receive them only through the `grading_cases` function at submit time.
 - Students see their own submissions. Authors see every submission to their quizzes.
 
-### Gemini (Study Area)
+### AI assistant (Study Area)
 
-Paste your own key from [Google AI Studio](https://aistudio.google.com) into the Study Area.
-It is kept in `sessionStorage`, or in `localStorage` if you tick "remember". It is sent only to
-Google's API and never to Supabase. Before anything generated can become a quiz, every expected
-verdict is recomputed from the generated reference regex or grammar.
+The Study Area uses **Google Gemini** on the free tier (`gemini-2.5-flash` by default, with `gemini-2.5-flash-lite` also allowed) for two things:
+
+- **Practice problem generator:** Gemini drafts a formal-language problem in textbook notation, a reference regular expression or grammar, a hint, and a suite of visible and hidden test cases. ProfAlan does not trust the AI's verdicts. It drops test strings outside Σ and duplicates, then recomputes every expected accept/reject from the reference answer with its own regex and Earley engines, before the problem can become a quiz.
+- **Language explainer:** given a regex, grammar or set-builder description, Gemini summarises the language and lists short members and non-members. ProfAlan re-checks each example and strikes out any the AI got wrong.
+
+How the key is kept private:
+
+- The project's Gemini key is never shipped to the browser and never committed. It is stored as a Supabase secret and used only by the [`gemini` Edge Function](supabase/functions/gemini/index.ts), which forwards requests from signed-in users to Google.
+- To enable it, get a free key from Google AI Studio, add `GEMINI_API_KEY` to your local `.env`, run `npx supabase login` once, then run `npm run ai:deploy`. The script stores the key as a secret and deploys the function.
+- Users can still paste their own key under "Use your own Gemini key instead". That key stays in their browser (sessionStorage, or localStorage if remembered) and is sent only to Google.
 
 ## Tests
 
