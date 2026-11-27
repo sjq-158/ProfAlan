@@ -129,7 +129,7 @@ public static class SampleLibrary
     private static Automaton TuringAnBn()
     {
         var m = Make(MachineKind.Turing, "Decide aⁿbⁿ", "Mark the leftmost a as X and the matching b as Y until none remain.", "ab",
-            [("s", 80, 120), ("q1", 230, 270), ("m", 230, 450), ("r", 470, 450), ("mb", 700, 450), ("l", 470, 270), ("c", 470, 120), ("y", 700, 120), ("n", 760, 300)],
+            [("s", 90, 150), ("q1", 230, 300), ("c", 430, 150), ("y", 800, 150), ("l", 430, 300), ("n", 800, 330), ("m", 230, 450), ("r", 430, 450), ("mb", 640, 450)],
             "s", ["y"]);
         foreach (var halt in new[] { "y", "n" }) m.FindState(halt)!.IsHalting = true;
 

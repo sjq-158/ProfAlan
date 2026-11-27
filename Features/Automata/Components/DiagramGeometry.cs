@@ -110,7 +110,11 @@ public static class DiagramGeometry
             .ToList();
         if (s.IsInitial) neighbourAngles.Add(Math.PI);
 
-        double[] candidates = [-Math.PI / 2, Math.PI / 2, 0, Math.PI];
+        const double reach = Radius + 80;
+        double[] candidates = new[] { -Math.PI / 2, Math.PI / 2, 0, Math.PI }
+            .Where(a => s.X + Math.Cos(a) * reach is > 0 and < Width && s.Y + Math.Sin(a) * reach is > 0 and < Height)
+            .DefaultIfEmpty(-Math.PI / 2)
+            .ToArray();
         if (neighbourAngles.Count == 0) return candidates[0];
 
         static double Gap(double a, double b)
