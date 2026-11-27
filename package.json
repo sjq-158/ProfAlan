@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "config": "node scripts/write-config.mjs",
+    "ai:deploy": "node scripts/deploy-ai.mjs",
     "css:build": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/app.css --minify",
     "css:watch": "tailwindcss -i ./Styles/app.css -o ./wwwroot/css/app.css --watch"
   },
