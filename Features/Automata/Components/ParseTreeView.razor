@@ -1,0 +1,65 @@
+@using ProfAlan.Domain.Grammars
+@using static ProfAlan.Features.Automata.Components.DiagramGeometry
+
+<svg viewBox="0 0 @F(width) @F(height)" style="width:@(F(width))px;max-width:none" class="h-auto text-ink" role="img" aria-label="Parse tree">
+    @foreach (var (parent, child) in links)
+    {
+        <line x1="@F(parent.X)" y1="@F(parent.Y + 11)" x2="@F(child.X)" y2="@F(child.Y - 11)" stroke="currentColor" stroke-width="1.2" opacity="0.55" />
+    }
+    @foreach (var node in nodes)
+    {
+        var variable = ContextFreeGrammar.IsVariable(node.Symbol);
+        <g>
+            @if (variable)
+            {
+                <circle cx="@F(node.X)" cy="@F(node.Y)" r="12" fill="var(--pa-card)" stroke="currentColor" stroke-width="1.4" />
+            }
+            <text x="@F(node.X)" y="@F(node.Y + 4.5)" text-anchor="middle" class="@($"fill-current font-mono text-[13px] {(variable ? "font-semibold" : "")}")">@node.Symbol</text>
+        </g>
+    }
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public ParseTreeNode Root { get; set; } = default!;
+
+    private sealed record Placed(char Symbol, double X, double Y);
+
+    private const double Gap = 34;
+    private const double Level = 52;
+    private readonly List<Placed> nodes = [];
+    private readonly List<(Placed Parent, Placed Child)> links = [];
+    private double width;
+    private double height;
+
+    protected override void OnParametersSet()
+    {
+        nodes.Clear();
+        links.Clear();
+        var nextLeaf = 0;
+        var depth = 0;
+        Layout(Root, 0, ref nextLeaf, ref depth);
+        width = Math.Max(nextLeaf * Gap + 20, 120);
+        height = depth * Level + 44;
+    }
+
+    private Placed Layout(ParseTreeNode node, int level, ref int nextLeaf, ref int depth)
+    {
+        depth = Math.Max(depth, level);
+        var y = 22 + level * Level;
+
+        if (node.IsLeaf)
+        {
+            var leaf = new Placed(node.Symbol, 20 + nextLeaf++ * Gap + Gap / 2 - 10, y);
+            nodes.Add(leaf);
+            return leaf;
+        }
+
+        var children = new List<Placed>();
+        foreach (var child in node.Children) children.Add(Layout(child, level + 1, ref nextLeaf, ref depth));
+
+        var placed = new Placed(node.Symbol, children.Average(c => c.X), y);
+        nodes.Add(placed);
+        foreach (var c in children) links.Add((placed, c));
+        return placed;
+    }
+}

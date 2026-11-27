@@ -1,0 +1,150 @@
+@using ProfAlan.Domain.Grammars
+
+<div class="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
+    <section class="card h-fit">
+        <div class="card-header">
+            <p class="eyebrow">Context-free grammar</p>
+            @if (grammar is not null)
+            {
+                <span class="badge-pass"><Icon Name="check" Class="size-3" /> @grammar.Rules.Count rules</span>
+            }
+            else
+            {
+                <span class="badge-fail">Syntax error</span>
+            }
+        </div>
+        <div class="space-y-3 p-4">
+            <label class="label" for="grammar-rules">Rules R, one variable per line. The first left-hand side is S.</label>
+            <textarea id="grammar-rules" rows="7" class="field field-mono text-[14px] leading-relaxed" spellcheck="false"
+                      value="@Rules" @oninput="e => SetRulesAsync(e.Value?.ToString())"></textarea>
+            <p class="text-xs text-muted">Variables are A–Z, everything else is a terminal. Separate alternatives with |, write e for the empty string.</p>
+
+            @if (error is not null)
+            {
+                <p class="flex items-start gap-2 text-sm text-fail"><Icon Name="alert" Class="mt-0.5 size-4" /> @error</p>
+            }
+            else if (grammar is not null)
+            {
+                <p class="font-mono text-[13px]">@grammar.FormalDefinition()</p>
+                @foreach (var v in grammar.UndefinedVariables())
+                {
+                    <p class="flex items-center gap-2 text-xs text-warn"><Icon Name="alert" /> @v appears on a right-hand side but has no rules, so it derives nothing.</p>
+                }
+                <button type="button" class="btn" @onclick="OpenAsPdaAsync"><Icon Name="stack" /> Build equivalent PDA (Lemma 3.4.1)</button>
+            }
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-header">
+            <p class="eyebrow">Membership and derivation</p>
+            @if (member is { } m)
+            {
+                <VerdictBadge Verdict="m ? Verdict.Accepted : Verdict.Rejected" />
+            }
+        </div>
+        <div class="space-y-4 p-4">
+            <form class="flex gap-2" @onsubmit="Check" @onsubmit:preventDefault="true">
+                <div class="relative flex-1">
+                    <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center font-mono text-sm text-muted">w =</span>
+                    <input class="field field-mono pl-11" @bind="word" placeholder="e (empty string)" spellcheck="false" aria-label="String to derive" />
+                </div>
+                <button type="submit" class="btn btn-primary" disabled="@(grammar is null)"><Icon Name="play" /> Derive</button>
+            </form>
+
+            @if (member == true && derivation is null)
+            {
+                <p class="text-sm text-muted">w ∈ L(G) (Earley parser), but the derivation is too long to display within the search budget.</p>
+            }
+            else if (member == false)
+            {
+                <p class="text-sm text-muted">No derivation S ⇒* w exists: the Earley parser finds no complete parse of w.</p>
+            }
+
+            @if (derivation is not null)
+            {
+                <div>
+                    <p class="mb-1.5 text-xs text-muted">Leftmost derivation · @(derivation.Steps.Count - 1) steps</p>
+                    <ol class="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-line bg-card p-3 font-mono text-[13px]">
+                        @for (var i = 0; i < derivation.Steps.Count; i++)
+                        {
+                            var step = derivation.Steps[i];
+                            <li class="flex items-baseline gap-2">
+                                <span class="w-4 shrink-0 text-right text-muted">@(i == 0 ? "" : "⇒")</span>
+                                <span>
+                                    @for (var k = 0; k < step.Form.Length; k++)
+                                    {
+                                        <span class="@(k == step.Position && step.Rule is not null ? "rounded bg-ink px-0.5 text-surface" : "")">@step.Form[k]</span>
+                                    }
+                                    @if (step.Form.Length == 0)
+                                    {
+                                        <span>e</span>
+                                    }
+                                </span>
+                                @if (step.Rule is not null)
+                                {
+                                    <span class="ml-auto shrink-0 text-xs text-muted">@step.Rule</span>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </div>
+
+                <div>
+                    <p class="mb-1.5 text-xs text-muted">Parse tree</p>
+                    <div class="overflow-x-auto rounded-lg border border-line bg-card p-2">
+                        <ParseTreeView Root="derivation.Tree" />
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public string Rules { get; set; } = "S → aSb | e";
+    [Parameter] public EventCallback<string> RulesChanged { get; set; }
+    [Parameter] public EventCallback<Automaton> OnOpenMachine { get; set; }
+
+    private ContextFreeGrammar? grammar;
+    private string? error;
+    private string word = "aabb";
+    private bool? member;
+    private Derivation? derivation;
+
+    protected override void OnParametersSet() => Parse();
+
+    private async Task SetRulesAsync(string? value)
+    {
+        Rules = value ?? "";
+        Parse();
+        member = null;
+        derivation = null;
+        await RulesChanged.InvokeAsync(Rules);
+    }
+
+    private void Parse()
+    {
+        try
+        {
+            grammar = ContextFreeGrammar.Parse(Rules);
+            error = null;
+        }
+        catch (GrammarSyntaxException ex)
+        {
+            grammar = null;
+            error = ex.Message;
+        }
+    }
+
+    private void Check()
+    {
+        if (grammar is null) return;
+        var w = Symbols.IsEmpty(word) && !grammar.Terminals.Contains('e') ? "" : word.Trim();
+        member = EarleyRecognizer.Accepts(grammar, w);
+        derivation = member == true ? DerivationTracer.FindLeftmost(grammar, w) : null;
+    }
+
+    private Task OpenAsPdaAsync() =>
+        grammar is null ? Task.CompletedTask : OnOpenMachine.InvokeAsync(GrammarToPda.Build(grammar));
+}

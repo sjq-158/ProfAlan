@@ -112,6 +112,38 @@ public sealed class EpsilonNfa
         return nfa;
     }
 
+    /// <summary>Exposes the construction as an NFA diagram (only states reachable from the start).</summary>
+    public Automaton ToAutomaton(IEnumerable<char> alphabet)
+    {
+        var reachable = new List<int> { Start };
+        var seen = new HashSet<int> { Start };
+        for (var i = 0; i < reachable.Count; i++)
+        {
+            foreach (var (_, to) in edges[reachable[i]])
+            {
+                if (seen.Add(to)) reachable.Add(to);
+            }
+        }
+
+        var names = reachable.Select((q, i) => (q, i)).ToDictionary(p => p.q, p => $"q{p.i}");
+        var machine = new Automaton
+        {
+            Kind = MachineKind.Nfa,
+            Name = "NFA from regular expression",
+            Alphabet = alphabet.Distinct().OrderBy(c => c).ToList(),
+            States = reachable.Select(q => new StateNode { Name = names[q], IsInitial = q == Start, IsFinal = accepting.Contains(q) }).ToList()
+        };
+        foreach (var q in reachable)
+        {
+            foreach (var (symbol, to) in edges[q])
+            {
+                machine.Transitions.Add(new TransitionRule { From = names[q], To = names[to], Read = symbol?.ToString() ?? "" });
+            }
+        }
+        machine.ArrangeLeftToRight();
+        return machine;
+    }
+
     public SortedSet<int> Closure(IEnumerable<int> states)
     {
         var closure = new SortedSet<int>(states);

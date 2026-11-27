@@ -1,0 +1,215 @@
+@using ProfAlan.Domain.Regular
+
+<div class="grid gap-5 lg:grid-cols-[1.25fr_1fr]">
+    <div class="space-y-5">
+        <section class="card">
+            <div class="card-header">
+                <p class="eyebrow">Regular expression</p>
+                @if (parsed is not null)
+                {
+                    <span class="badge-pass"><Icon Name="check" Class="size-3" /> Well formed</span>
+                }
+                else if (error is not null)
+                {
+                    <span class="badge-fail">Syntax error</span>
+                }
+            </div>
+            <div class="space-y-3 p-4">
+                <div>
+                    <label class="label" for="regex-text">R</label>
+                    <input id="regex-text" class="field field-mono text-base" value="@Expression" @oninput="e => SetExpressionAsync(e.Value?.ToString())"
+                           placeholder="a(a ∪ b)*bb" spellcheck="false" autocomplete="off" />
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5">
+                    @foreach (var token in new[] { "∪", "*", "(", ")", "e", "∅" })
+                    {
+                        <button type="button" class="chip hover:bg-soft" @onclick="() => SetExpressionAsync(Expression + token)">@token</button>
+                    }
+                    <span class="ml-1 text-xs text-muted">Union may also be typed as + or |.</span>
+                </div>
+
+                @if (error is not null)
+                {
+                    <p class="flex items-start gap-2 text-sm text-fail"><Icon Name="alert" Class="mt-0.5 size-4" /> @error</p>
+                }
+                else if (parsed is not null)
+                {
+                    <dl class="grid grid-cols-[5.5rem_1fr] gap-y-1.5 font-mono text-[13px]">
+                        <dt class="font-sans text-muted">Read as</dt>
+                        <dd class="break-all">@parsed</dd>
+                        <dt class="font-sans text-muted">Σ</dt>
+                        <dd>{@string.Join(", ", Alphabet)}</dd>
+                        <dt class="font-sans text-muted">Shortest</dt>
+                        <dd class="break-all">@(samples.Count == 0 ? "L(R) = ∅" : string.Join(", ", samples.Select(Symbols.Show)))</dd>
+                    </dl>
+                    <button type="button" class="btn" @onclick="OpenAsNfaAsync"><Icon Name="graph" /> Open as NFA (Thompson construction)</button>
+                }
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <p class="eyebrow">Membership</p>
+                @if (parsed is not null && membership is { } accepted)
+                {
+                    <VerdictBadge Verdict="accepted ? Verdict.Accepted : Verdict.Rejected" />
+                }
+            </div>
+            <div class="space-y-2 p-4">
+                <label class="label" for="regex-word">Is w ∈ L(R)?</label>
+                <input id="regex-word" class="field field-mono" @bind="word" @bind:event="oninput" @bind:after="CheckMembership" placeholder="e (empty string)" spellcheck="false" />
+                <p class="text-xs text-muted">Checked live by simulating the e-NFA built from R.</p>
+            </div>
+        </section>
+    </div>
+
+    <section class="card h-fit">
+        <div class="card-header">
+            <p class="eyebrow">Language equivalence</p>
+            @if (comparison is not null)
+            {
+                @if (comparison.Value.Difference is null)
+                {
+                    <span class="badge-pass"><Icon Name="equal" Class="size-3" /> Equivalent</span>
+                }
+                else
+                {
+                    <span class="badge-fail">Different</span>
+                }
+            }
+        </div>
+        <div class="space-y-3 p-4">
+            <div class="flex gap-1 rounded-lg border border-line p-0.5 text-sm">
+                <button type="button" class="@($"flex-1 rounded-md px-2 py-1.5 {(compareWithMachine ? "" : "bg-ink text-surface")}")" @onclick="() => compareWithMachine = false">Another regex</button>
+                <button type="button" class="@($"flex-1 rounded-md px-2 py-1.5 {(compareWithMachine ? "bg-ink text-surface" : "")}")" @onclick="() => compareWithMachine = true">A DFA / NFA</button>
+            </div>
+
+            @if (compareWithMachine)
+            {
+                @if (FiniteMachines.Count == 0)
+                {
+                    <p class="text-sm text-muted">Build a DFA or NFA in the sandbox first; it will appear here.</p>
+                }
+                else
+                {
+                    <label class="label" for="regex-machine">Machine</label>
+                    <select id="regex-machine" class="field" @bind="machineIndex">
+                        @for (var i = 0; i < FiniteMachines.Count; i++)
+                        {
+                            <option value="@i">@FiniteMachines[i].Kind.ShortName() · @FiniteMachines[i].Name</option>
+                        }
+                    </select>
+                }
+            }
+            else
+            {
+                <label class="label" for="regex-other">R₂</label>
+                <input id="regex-other" class="field field-mono" @bind="other" placeholder="(a ∪ b)*bb" spellcheck="false" />
+            }
+
+            <button type="button" class="btn btn-primary w-full" disabled="@(parsed is null)" @onclick="Compare"><Icon Name="equal" /> Compare languages</button>
+
+            @if (comparison is { } c)
+            {
+                @if (c.Error is not null)
+                {
+                    <p class="text-sm text-fail">@c.Error</p>
+                }
+                else if (c.Difference is null)
+                {
+                    <p class="text-sm">L(R) = L(@c.OtherName). The subset construction found no string on which they disagree.</p>
+                }
+                else
+                {
+                    <div class="rounded-lg border border-line bg-surface/60 p-3 text-sm">
+                        <p>Shortest counterexample: <span class="font-mono font-semibold">w = @Symbols.Show(c.Difference.Word)</span></p>
+                        <p class="mt-1 text-muted">
+                            w @(c.Difference.InFirst ? "∈" : "∉") L(R) but w @(c.Difference.InSecond ? "∈" : "∉") L(@c.OtherName).
+                        </p>
+                    </div>
+                }
+            }
+        </div>
+    </section>
+</div>
+
+@code {
+    [Parameter] public string Expression { get; set; } = "a(a ∪ b)*bb";
+    [Parameter] public EventCallback<string> ExpressionChanged { get; set; }
+    [Parameter] public IReadOnlyList<Automaton> FiniteMachines { get; set; } = [];
+    [Parameter] public EventCallback<Automaton> OnOpenMachine { get; set; }
+
+    private RegexNode? parsed;
+    private string? error;
+    private EpsilonNfa? nfa;
+    private IReadOnlyList<string> samples = [];
+    private string word = "";
+    private bool? membership;
+    private bool compareWithMachine;
+    private int machineIndex;
+    private string other = "";
+    private (Counterexample? Difference, string OtherName, string? Error)? comparison;
+
+    private List<char> Alphabet => (parsed?.SymbolsUsed() ?? []).Distinct().OrderBy(c => c).ToList();
+
+    protected override void OnParametersSet() => Parse();
+
+    private async Task SetExpressionAsync(string? value)
+    {
+        Expression = value ?? "";
+        comparison = null;
+        Parse();
+        await ExpressionChanged.InvokeAsync(Expression);
+    }
+
+    private void Parse()
+    {
+        if (RegexParser.TryParse(Expression, out var node, out var message))
+        {
+            parsed = node;
+            error = null;
+            nfa = EpsilonNfa.FromRegex(node!);
+            samples = nfa.SampleMembers(Alphabet, 8);
+        }
+        else
+        {
+            parsed = null;
+            nfa = null;
+            error = message;
+            samples = [];
+        }
+        CheckMembership();
+    }
+
+    private void CheckMembership()
+    {
+        var w = Symbols.IsEmpty(word) ? "" : word.Trim();
+        membership = nfa?.Accepts(w);
+    }
+
+    private void Compare()
+    {
+        if (nfa is null) return;
+
+        if (compareWithMachine)
+        {
+            if (FiniteMachines.Count == 0) return;
+            var machine = FiniteMachines[Math.Clamp(machineIndex, 0, FiniteMachines.Count - 1)];
+            var alphabet = Alphabet.Union(machine.Alphabet);
+            var diff = LanguageComparer.FindDifference(nfa, EpsilonNfa.FromAutomaton(machine), alphabet);
+            comparison = (diff, "M", null);
+            return;
+        }
+
+        if (!RegexParser.TryParse(other, out var second, out var message))
+        {
+            comparison = (null, "R₂", $"R₂: {message}");
+            return;
+        }
+        var otherNfa = EpsilonNfa.FromRegex(second!);
+        comparison = (LanguageComparer.FindDifference(nfa, otherNfa, Alphabet.Union(second!.SymbolsUsed())), "R₂", null);
+    }
+
+    private Task OpenAsNfaAsync() =>
+        nfa is null ? Task.CompletedTask : OnOpenMachine.InvokeAsync(nfa.ToAutomaton(Alphabet));
+}
