@@ -1,0 +1,261 @@
+@page "/features"
+@layout BareLayout
+@using ProfAlan.Domain.Grammars
+@using ProfAlan.Domain.Regular
+@using ProfAlan.Features.Home.Components
+
+<PageTitle>Features · ProfAlan</PageTitle>
+
+<div class="grid-paper-soft relative flex min-h-screen flex-col overflow-hidden">
+    <PublicHeader />
+
+    <main class="flex-1">
+        <section class="mx-auto max-w-4xl px-4 pb-8 pt-16 text-center sm:px-8">
+            <p class="eyebrow fade-up">Features</p>
+            <h1 class="fade-up mt-4 font-display text-5xl leading-tight sm:text-6xl" style="animation-delay:.06s">
+                Everything you need to <span class="marker">learn</span> automata theory
+            </h1>
+            <p class="fade-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted" style="animation-delay:.12s">
+                Build machines, watch them compute, check your definitions against the textbook, and get graded,
+                all in one place. Here is a look at what you will use.
+            </p>
+        </section>
+
+        <nav class="mx-auto mt-6 flex max-w-5xl flex-wrap justify-center gap-2 px-4" aria-label="Jump to a feature">
+            @foreach (var section in Sections)
+            {
+                <a href="@($"features#{section.Id}")" class="rounded-full border border-line bg-card px-4 py-1.5 text-sm transition hover:shadow-sm">@section.Name</a>
+            }
+        </nav>
+
+        <div class="mx-auto mt-16 max-w-6xl space-y-28 px-4 sm:px-8">
+            @Row("builders", "Builders", "Draw it, or fill in the table",
+                "Construct DFAs, NFAs, PDAs and Turing machines on an infinite canvas you can zoom and pan like Desmos, or fill in the transition table row by row. Both views edit the same machine, so a change in one appears instantly in the other.",
+                ["Drag states in from a shape palette, then pull a transition from the + handle, as in draw.io.",
+                 "Finite automata use the dot notation from class: small states, names underneath, a ring for final states.",
+                 "The table lists every (q, σ) pair, so a missing transition is impossible to miss."],
+                BuilderSnap, flip: false)
+
+            @Row("visualizer", "Step-by-step visualizer", "Watch every configuration",
+                "Play, pause or step through a computation one configuration at a time. The active state is highlighted on the diagram, and the input, stack or tape updates as you go.",
+                ["Configurations are written exactly as in the textbook: (q, w) ⊢ (q′, w′).",
+                 "Pushdown automata show the stack with its top marked; Turing machines show the tape and the read/write head.",
+                 "A green or red badge gives the verdict the moment the computation ends."],
+                VisualizerSnap, flip: true)
+
+            @Row("checkers", "Checkers", "Know exactly what is wrong",
+                "Every machine is checked against the formal definition in Lewis & Papadimitriou. Instead of a vague error, you get the exact rule that is broken, and often a one-click fix.",
+                ["DFA: δ must be total and deterministic. Missing arrows can be sent to a generated trap state.",
+                 "PDA: acceptance requires a final state and an empty stack. TM: the head must move right on ▷.",
+                 "Grammars show a leftmost derivation and parse tree; regular expressions can be compared for equivalence."],
+                CheckerSnap, flip: false)
+
+            @Row("quizzes", "Quiz Arena", "CodeChum-style problems for automata",
+                "Instructors describe a language and add visible and hidden test cases. Students submit a machine, a regular expression or a grammar and are graded automatically.",
+                ["Hidden cases are never shown, only whether they passed.",
+                 "Instructors can generate every string up to a length and label them from a reference answer.",
+                 "Students see their attempt history; instructors see every submission."],
+                QuizSnap, flip: true)
+
+            @Row("study", "AI Study Area", "Notes, examples and generated practice",
+                "Read short notes for each chapter of the textbook, then practise with problems written by Google Gemini. ProfAlan re-checks every answer the AI gives before you see it.",
+                ["Seven topics from alphabets and languages to Turing machines.",
+                 "Generated problems come with a hint, a reference answer and a test suite.",
+                 "Any test verdict that disagrees with the reference answer is corrected automatically."],
+                StudySnap, flip: false)
+        </div>
+
+        <section class="mx-auto mt-28 max-w-3xl px-4 text-center sm:px-8">
+            <h2 class="font-display text-4xl">Ready to try it?</h2>
+            <p class="mt-4 text-muted">Create a free account to save your machines and take quizzes.</p>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="dashboard" class="raised-button mt-10">Go to dashboard</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="register" class="raised-button mt-10">Sign up free</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </section>
+    </main>
+
+    <PublicFooter />
+</div>
+
+@code {
+    private static readonly (string Id, string Name)[] Sections =
+    [
+        ("builders", "Builders"), ("visualizer", "Visualizer"), ("checkers", "Checkers"),
+        ("quizzes", "Quiz Arena"), ("study", "AI Study Area")
+    ];
+
+    private readonly Automaton dfa = SampleLibrary.Find("dfa-a-bb")!.Build();
+    private Configuration tmStep = default!;
+    private IReadOnlyList<Configuration> tmPath = [];
+    private Configuration pdaStep = default!;
+    private Automaton partialDfa = default!;
+    private Counterexample? difference;
+    private Derivation? derivation;
+    private GradeReport report = default!;
+
+    protected override void OnInitialized()
+    {
+        var tm = new TuringEngine(SampleLibrary.Find("tm-anbn")!.Build()).Run("aabb");
+        tmPath = tm.Path;
+        tmStep = tm.Path[Math.Min(6, tm.Path.Count - 1)];
+
+        var pda = new PdaEngine(SampleLibrary.Find("pda-anbn")!.Build()).Run("aaabbb");
+        pdaStep = pda.Path[Math.Min(3, pda.Path.Count - 1)];
+
+        partialDfa = SampleLibrary.Find("dfa-a-bb")!.Build();
+        partialDfa.Transitions.RemoveAll(t => t.From == "q4" || (t.From == "q0" && t.Read == "b"));
+
+        difference = LanguageComparer.FindDifference(
+            EpsilonNfa.FromRegex(RegexParser.Parse("a(a ∪ b)*bb")),
+            EpsilonNfa.FromRegex(RegexParser.Parse("(a ∪ b)*bb")), "ab");
+
+        derivation = DerivationTracer.FindLeftmost(ContextFreeGrammar.Parse("S → aSb | e"), "aabb");
+
+        var (quiz, cases) = SeedQuizzes.Build()[0];
+        report = QuizGrader.EvaluateTestCases(quiz, dfa.ToJson(), cases);
+    }
+
+    private RenderFragment Row(string id, string eyebrow, string title, string text, string[] points, RenderFragment snap, bool flip) => __builder =>
+    {
+        <section id="@id" class="grid scroll-mt-10 items-center gap-10 lg:grid-cols-2 lg:gap-16">
+            <div class="@(flip ? "lg:order-2" : "")">
+                <p class="eyebrow">@eyebrow</p>
+                <h2 class="mt-3 font-display text-4xl leading-tight">@title</h2>
+                <p class="mt-5 text-lg leading-relaxed text-muted">@text</p>
+                <ul class="mt-6 space-y-3">
+                    @foreach (var point in points)
+                    {
+                        <li class="flex gap-3">
+                            <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-ink text-surface"><Icon Name="check" Class="size-3.5" StrokeWidth="2.5" /></span>
+                            <span class="leading-relaxed">@point</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+            <div class="@(flip ? "lg:order-1" : "")">@snap</div>
+        </section>
+    };
+
+    private RenderFragment BuilderSnap => __builder =>
+    {
+        <PreviewFrame Title="Sandbox · DFA · Starts with a, ends with bb" Caption="The graphical builder and the transition table show the same machine.">
+            <div class="h-60 border-b border-line bg-surface/40">
+                <StateDiagram Machine="dfa" ReadOnly="true" />
+            </div>
+            <div class="grid grid-cols-2 font-mono text-xs">
+                @foreach (var half in new[] { dfa.Transitions.Take(5), dfa.Transitions.Skip(5).Take(5) })
+                {
+                    <table class="w-full border-line odd:border-r">
+                        <thead class="bg-soft font-sans text-muted">
+                            <tr><th class="px-3 py-1.5 text-left font-medium">q</th><th class="px-3 py-1.5 text-left font-medium">σ</th><th class="px-3 py-1.5 text-left font-medium">δ(q, σ)</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rule in half)
+                            {
+                                <tr class="border-t border-line"><td class="px-3 py-1">@rule.From</td><td class="px-3 py-1">@rule.Read</td><td class="px-3 py-1">@rule.To</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </PreviewFrame>
+    };
+
+    private RenderFragment VisualizerSnap => __builder =>
+    {
+        <PreviewFrame Title="Visualizer · TM deciding aⁿbⁿ on w = aabb" Caption="A Turing machine mid-computation, next to a PDA's stack.">
+            <div class="space-y-4 p-5">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-muted">State</span>
+                    <span class="rounded-md bg-ink px-2 py-0.5 font-mono text-surface">@tmStep.State</span>
+                    <span class="badge-muted ml-auto font-mono">step 6 / @(tmPath.Count - 1)</span>
+                </div>
+                <TapeView Tape="@tmStep.Tape" Head="tmStep.Head" />
+                <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+                    <ol class="space-y-1 rounded-lg border border-line bg-surface/50 p-3 font-mono text-[12px]">
+                        @for (var i = 0; i <= 6 && i < tmPath.Count; i++)
+                        {
+                            <li class="@(i == 6 ? "rounded bg-ink px-1 text-surface" : "")">@(i == 0 ? "  " : "⊢ ")@ConfigurationNotation.Format(MachineKind.Turing, tmPath[i])</li>
+                        }
+                    </ol>
+                    <div>
+                        <p class="mb-1.5 text-xs text-muted">PDA stack</p>
+                        <StackView Stack="@pdaStep.Stack" />
+                    </div>
+                </div>
+            </div>
+        </PreviewFrame>
+    };
+
+    private RenderFragment CheckerSnap => __builder =>
+    {
+        <PreviewFrame Title="Checkers · DFA, regex and grammar">
+            <div class="space-y-4 p-5">
+                <DefinitionIssues Machine="partialDfa" ReadOnly="true" />
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="rounded-xl border border-line bg-surface/50 p-4 text-sm">
+                        <p class="eyebrow mb-2">Regex equivalence</p>
+                        <p class="font-mono text-xs">a(a ∪ b)*bb  vs  (a ∪ b)*bb</p>
+                        @if (difference is not null)
+                        {
+                            <p class="mt-2">Counterexample: <span class="font-mono font-semibold">w = @Symbols.Show(difference.Word)</span></p>
+                        }
+                    </div>
+                    <div class="rounded-xl border border-line bg-surface/50 p-4">
+                        <p class="eyebrow mb-2">Leftmost derivation</p>
+                        <p class="font-mono text-xs">@string.Join(" ⇒ ", derivation?.Steps.Select(s => s.Form.Length == 0 ? "e" : s.Form) ?? [])</p>
+                        @if (derivation is not null)
+                        {
+                            <div class="mt-2 overflow-hidden"><ParseTreeView Root="derivation.Tree" /></div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </PreviewFrame>
+    };
+
+    private RenderFragment QuizSnap => __builder =>
+    {
+        <PreviewFrame Title="Quiz Arena · Starts with a and ends with bb" Caption="Sample cases show the string; hidden cases show only the result.">
+            <div class="max-h-[26rem] overflow-hidden p-4">
+                <GradeResults Report="report" IsSubmission="true" />
+            </div>
+        </PreviewFrame>
+    };
+
+    private RenderFragment StudySnap => __builder =>
+    {
+        <PreviewFrame Title="Study Area · AI practice generator" Caption="An example of a generated problem after ProfAlan has verified it.">
+            <div class="space-y-4 p-5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="chip">DFA</span>
+                    <span class="chip">Σ = {a, b}</span>
+                    <span class="badge-pass ml-auto">Verified by ProfAlan</span>
+                </div>
+                <div>
+                    <p class="font-display text-xl">Even number of b's</p>
+                    <p class="mt-1 text-sm leading-relaxed">Construct a DFA for L = { w ∈ {a,b}* | w contains an even number of b's }.</p>
+                </div>
+                <p class="flex items-start gap-2 text-xs text-muted"><Icon Name="info" Class="mt-0.5 size-3.5" /> Every expected verdict agrees with the reference answer.</p>
+                <table class="w-full overflow-hidden rounded-lg border border-line text-left text-sm">
+                    <thead class="bg-soft text-xs text-muted"><tr><th class="px-3 py-1.5 font-medium">Input</th><th class="px-3 py-1.5 font-medium">Expected</th><th class="px-3 py-1.5 font-medium">Visibility</th></tr></thead>
+                    <tbody>
+                        @foreach (var (w, accept, hidden) in new[] { ("e", true, false), ("b", false, false), ("abba", true, true), ("bab", true, true) })
+                        {
+                            <tr class="border-t border-line">
+                                <td class="px-3 py-1.5 font-mono">@w</td>
+                                <td class="@($"px-3 py-1.5 font-medium {(accept ? "text-pass" : "text-fail")}")">@(accept ? "Accept" : "Reject")</td>
+                                <td class="px-3 py-1.5 text-muted">@(hidden ? "Hidden" : "Visible")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </PreviewFrame>
+    };
+}

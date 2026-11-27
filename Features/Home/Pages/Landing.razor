@@ -1,31 +1,11 @@
 @page "/"
 @layout BareLayout
+@using ProfAlan.Features.Home.Components
 
 <PageTitle>ProfAlan · Automata theory studio</PageTitle>
 
 <div class="grid-paper-soft relative flex min-h-screen flex-col overflow-hidden">
-    <header class="relative z-10 mx-auto flex w-full max-w-7xl items-center gap-8 px-4 py-6 sm:px-8">
-        <a href="" class="flex items-center gap-2.5">
-            <BrandMark Class="size-9 text-ink" />
-            <span class="font-display text-2xl">ProfAlan</span>
-        </a>
-        <nav class="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
-            <a href="#features" class="transition hover:text-ink">Features</a>
-            <a href="#about" class="transition hover:text-ink">About us</a>
-        </nav>
-        <div class="ml-auto flex items-center gap-3 sm:gap-5">
-            <ThemePicker />
-            <AuthorizeView>
-                <Authorized>
-                    <a href="dashboard" class="rounded-full bg-card px-6 py-3 text-sm font-semibold shadow-sm transition hover:shadow-md">Dashboard</a>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="login" class="hidden text-sm font-semibold transition hover:opacity-70 sm:inline">Sign in</a>
-                    <a href="register" class="rounded-full bg-card px-6 py-3 text-sm font-semibold shadow-sm transition hover:shadow-md">Sign up</a>
-                </NotAuthorized>
-            </AuthorizeView>
-        </div>
-    </header>
+    <PublicHeader />
 
     <main class="relative flex-1">
         <section class="relative mx-auto max-w-7xl px-4 pb-24 pt-16 text-center sm:px-8 sm:pt-24">
@@ -89,6 +69,10 @@
             }
         </section>
 
+        <div class="mt-10 text-center">
+            <a href="features" class="btn-pill bg-card">See every feature in detail <Icon Name="arrow-right" /></a>
+        </div>
+
         <section id="about" class="mx-auto mt-24 max-w-3xl scroll-mt-8 px-4 text-center sm:px-8">
             <p class="eyebrow">About us</p>
             <h2 class="mt-3 font-display text-3xl sm:text-4xl">Built for the automata theory classroom</h2>
@@ -97,12 +81,11 @@
                 It gives students one place to learn, simulate and be assessed on formal languages, and gives
                 instructors CodeChum-style problems with hidden test cases.
             </p>
+            <a href="about" class="btn-pill mt-8 bg-card">More about ProfAlan <Icon Name="arrow-right" /></a>
         </section>
     </main>
 
-    <footer class="mt-24 border-t border-line px-4 py-10 text-center text-sm text-muted">
-        Developed for CSIT321 · Applications Development and Emerging Technologies
-    </footer>
+    <PublicFooter />
 </div>
 
 @code {
