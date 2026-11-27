@@ -18,7 +18,7 @@ public static class SeedQuizzes
             Make("Contains bba", "Construct an NFA for L = { w ∈ {a,b}* | w contains bba as a substring }.",
                 AnswerKind.Nfa, "ab", "(a ∪ b)*bba(a ∪ b)*",
                 ["bba", "abba", "bb", "aba"], ["bbba", "babba", "bab", "", "aabbaa"]),
-            Make("Even length, aa or bb in the middle", "Write a regular expression for strings over {a,b} that begin with aa or bb followed by any number of ab blocks.",
+            Make("aa or bb, then ab blocks", "Write a regular expression for strings over {a,b} that begin with aa or bb followed by any number of ab blocks.",
                 AnswerKind.Regex, "ab", "(aa ∪ bb)(ab)*",
                 ["aa", "bbab", "ab", "aab"], ["aaabab", "bb", "abab", "", "bba"]),
             Make("Equal a's then b's", "Construct a PDA for L = { aⁿbⁿ : n ≥ 0 }. Accept by final state with an empty stack.",

@@ -42,7 +42,7 @@ select q.id, v.position, v.input, v.should_accept, v.is_hidden from q, (values
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'Even length, aa or bb in the middle',
+    values (null, 'ProfAlan course staff', 'aa or bb, then ab blocks',
             'Write a regular expression for strings over {a,b} that begin with aa or bb followed by any number of ab blocks.', 'regex', 'ab', true, 4, 5)
     returning id
 ) -- reference: (aa ∪ bb)(ab)*

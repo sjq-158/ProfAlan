@@ -137,19 +137,19 @@
   }
 
   .badge-pass {
-    @apply inline-flex items-center gap-1 rounded-full bg-pass px-2.5 py-0.5 text-xs font-semibold text-white;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-pass px-2.5 py-0.5 text-xs font-semibold text-white;
   }
 
   .badge-fail {
-    @apply inline-flex items-center gap-1 rounded-full bg-fail px-2.5 py-0.5 text-xs font-semibold text-white;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-fail px-2.5 py-0.5 text-xs font-semibold text-white;
   }
 
   .badge-warn {
-    @apply inline-flex items-center gap-1 rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-white;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warn px-2.5 py-0.5 text-xs font-semibold text-white;
   }
 
   .badge-muted {
-    @apply inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-0.5 text-xs font-medium text-muted;
+    @apply inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line px-2.5 py-0.5 text-xs font-medium text-muted;
   }
 
   .tab {
