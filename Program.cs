@@ -5,6 +5,7 @@ using ProfAlan;
 using ProfAlan.Features.Auth.Services;
 using ProfAlan.Features.Automata.Services;
 using ProfAlan.Features.Quizzes.Services;
+using ProfAlan.Features.StudyArea.Services;
 using ProfAlan.Shared.Services;
 using ProfAlan.Shared.Supabase;
 
@@ -28,6 +29,8 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddScoped<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
 builder.Services.AddScoped<SandboxDrafts>();
 builder.Services.AddScoped<PendingQuizDraft>();
+builder.Services.AddScoped<ApiKeyVault>();
+builder.Services.AddScoped<GeminiClient>();
 
 if (supabase.IsConfigured)
 {

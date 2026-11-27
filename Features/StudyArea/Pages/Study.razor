@@ -1,0 +1,78 @@
+@page "/study"
+@page "/study/{Slug}"
+@using ProfAlan.Features.StudyArea.Services
+@using ProfAlan.Features.StudyArea.Components
+
+<PageTitle>Study Area · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <PageHeader Eyebrow="Study Area" Title="Learn, then practice"
+                Subtitle="Notes that follow Lewis & Papadimitriou, each linked to a worked example you can run, plus an AI assistant that drafts practice problems with verified test suites." />
+
+    <div class="mb-6 flex gap-1 rounded-lg border border-line bg-soft p-1 sm:w-fit" role="tablist">
+        <a href="@NotesHref" role="tab" aria-selected="@(!ShowGenerator)" class="@($"tab flex flex-1 items-center justify-center gap-1.5 sm:flex-none {(!ShowGenerator ? "tab-active" : "")}")">
+            <Icon Name="book" Class="size-3.5" /> Theory notes
+        </a>
+        <a href="study/practice" role="tab" aria-selected="@ShowGenerator" class="@($"tab flex flex-1 items-center justify-center gap-1.5 sm:flex-none {(ShowGenerator ? "tab-active" : "")}")">
+            <Icon Name="wand" Class="size-3.5" /> AI practice generator
+        </a>
+    </div>
+
+    @if (ShowGenerator)
+    {
+        <PracticeGenerator />
+    }
+    else
+    {
+        <div class="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <nav class="h-fit lg:sticky lg:top-24" aria-label="Topics">
+                <ol class="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+                    @for (var i = 0; i < TheoryNotes.Topics.Count; i++)
+                    {
+                        var t = TheoryNotes.Topics[i];
+                        var active = t.Slug == Current.Slug;
+                        <li class="shrink-0">
+                            <a href="@($"study/{t.Slug}")" class="@($"flex items-baseline gap-3 rounded-lg px-3 py-2 text-sm transition {(active ? "bg-ink text-surface" : "hover:bg-soft")}")">
+                                <span class="font-mono text-xs opacity-70">@(i + 1)</span>
+                                <span>@t.Title</span>
+                            </a>
+                        </li>
+                    }
+                </ol>
+            </nav>
+
+            <div class="min-w-0 space-y-4">
+                <TopicView Topic="Current" />
+                <div class="flex justify-between gap-2">
+                    @if (Previous is { } p)
+                    {
+                        <a href="@($"study/{p.Slug}")" class="btn"><Icon Name="arrow-left" /> @p.Title</a>
+                    }
+                    else
+                    {
+                        <span></span>
+                    }
+                    @if (Next is { } n)
+                    {
+                        <a href="@($"study/{n.Slug}")" class="btn">@n.Title <Icon Name="arrow-right" /></a>
+                    }
+                    else
+                    {
+                        <a href="study/practice" class="btn btn-primary">Generate practice <Icon Name="arrow-right" /></a>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Slug { get; set; }
+
+    private bool ShowGenerator => Slug == "practice";
+    private int Index => Math.Max(0, TheoryNotes.Topics.ToList().FindIndex(t => t.Slug == Slug));
+    private ProfAlan.Features.StudyArea.Models.TheoryTopic Current => TheoryNotes.Topics[Index];
+    private ProfAlan.Features.StudyArea.Models.TheoryTopic? Previous => Index > 0 ? TheoryNotes.Topics[Index - 1] : null;
+    private ProfAlan.Features.StudyArea.Models.TheoryTopic? Next => Index < TheoryNotes.Topics.Count - 1 ? TheoryNotes.Topics[Index + 1] : null;
+    private string NotesHref => $"study/{Current.Slug}";
+}

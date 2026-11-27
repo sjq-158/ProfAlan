@@ -1,0 +1,336 @@
+@using ProfAlan.Domain.Regular
+@using ProfAlan.Features.StudyArea.Models
+@using ProfAlan.Features.StudyArea.Services
+@implements IDisposable
+@inject ApiKeyVault Vault
+@inject GeminiClient Gemini
+@inject PendingQuizDraft Pending
+@inject AuthSession Auth
+@inject NavigationManager Navigation
+
+<div class="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+    <aside class="space-y-5">
+        <section class="card">
+            <div class="card-header">
+                <p class="eyebrow">Your Gemini API key</p>
+                @if (savedKey is not null)
+                {
+                    <span class="badge-pass"><Icon Name="key" Class="size-3" /> Ready</span>
+                }
+            </div>
+            <div class="space-y-3 p-4">
+                @if (savedKey is null)
+                {
+                    <div class="relative">
+                        <input type="@(showKey ? "text" : "password")" class="field field-mono pr-10" @bind="keyInput" placeholder="AIza..." autocomplete="off" aria-label="Gemini API key" />
+                        <button type="button" class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-ink" aria-label="@(showKey ? "Hide key" : "Show key")" @onclick="() => showKey = !showKey">
+                            <Icon Name="@(showKey ? "eye-off" : "eye")" />
+                        </button>
+                    </div>
+                    <label class="flex items-center gap-2 text-sm">
+                        <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" @bind="remember" /> Remember on this device
+                    </label>
+                    <button type="button" class="btn btn-primary w-full" disabled="@string.IsNullOrWhiteSpace(keyInput)" @onclick="SaveKeyAsync"><Icon Name="key" /> Use this key</button>
+                }
+                else
+                {
+                    <p class="font-mono text-sm">@Masked</p>
+                    <p class="text-xs text-muted">@(remembered ? "Stored in this browser's localStorage." : "Stored for this tab only (sessionStorage).")</p>
+                    <button type="button" class="btn w-full" @onclick="ForgetKeyAsync"><Icon Name="trash" /> Forget key</button>
+                }
+                <p class="flex gap-2 text-xs text-muted">
+                    <Icon Name="shield" Class="mt-0.5 size-3.5" />
+                    <span>Your key stays in your browser and is sent only to Google's Gemini API. ProfAlan never stores it in the database. Get one at aistudio.google.com.</span>
+                </p>
+                <div>
+                    <label class="label" for="gemini-model">Model</label>
+                    <input id="gemini-model" class="field field-mono" list="gemini-models" @bind="model" />
+                    <datalist id="gemini-models">
+                        @foreach (var m in GeminiClient.SuggestedModels)
+                        {
+                            <option value="@m"></option>
+                        }
+                    </datalist>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <div class="flex gap-1 rounded-lg bg-soft p-0.5 text-sm">
+                    <button type="button" class="@($"tab px-2.5 py-1 {(mode == "problem" ? "tab-active" : "")}")" @onclick='() => mode = "problem"'>Practice problem</button>
+                    <button type="button" class="@($"tab px-2.5 py-1 {(mode == "explain" ? "tab-active" : "")}")" @onclick='() => mode = "explain"'>Explain a language</button>
+                </div>
+            </div>
+            <div class="space-y-3 p-4">
+                @if (mode == "problem")
+                {
+                    <div>
+                        <label class="label" for="gen-kind">Solver submits a</label>
+                        <select id="gen-kind" class="field" @bind="answerKind">
+                            @foreach (var kind in Enum.GetValues<AnswerKind>())
+                            {
+                                <option value="@kind">@kind.Label()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label" for="gen-diff">Difficulty</label>
+                            <select id="gen-diff" class="field" @bind="difficulty">
+                                <option>introductory</option>
+                                <option>midterm level</option>
+                                <option>challenging</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label" for="gen-sigma">Alphabet Σ</label>
+                            <input id="gen-sigma" class="field field-mono" @bind="alphabet" />
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label" for="gen-topic">Topic focus (optional)</label>
+                        <input id="gen-topic" class="field" @bind="topic" placeholder="substrings, counting modulo k, ..." />
+                    </div>
+                    <button type="button" class="btn btn-primary w-full" disabled="@(savedKey is null || busy)" @onclick="GenerateAsync">
+                        @if (busy) { <Spinner /> } else { <Icon Name="wand" /> }
+                        Generate problem
+                    </button>
+                }
+                else
+                {
+                    <div>
+                        <label class="label" for="explain-text">Regular expression, grammar or set notation</label>
+                        <textarea id="explain-text" rows="3" class="field field-mono" @bind="languageText" placeholder="(a ∪ b)*bba(a ∪ b)*"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-primary w-full" disabled="@(savedKey is null || busy || string.IsNullOrWhiteSpace(languageText))" @onclick="ExplainAsync">
+                        @if (busy) { <Spinner /> } else { <Icon Name="book" /> }
+                        Explain
+                    </button>
+                }
+                @if (savedKey is null)
+                {
+                    <p class="text-xs text-muted">Add your API key above to enable generation.</p>
+                }
+            </div>
+        </section>
+    </aside>
+
+    <div class="min-w-0">
+        @if (error is not null)
+        {
+            <p class="mb-5 flex items-start gap-2 rounded-lg border border-fail/30 bg-fail/10 px-4 py-3 text-sm text-fail"><Icon Name="alert" Class="mt-0.5 size-4" /> @error</p>
+        }
+
+        @if (mode == "problem" && problem is not null)
+        {
+            <article class="card">
+                <div class="card-header">
+                    <div class="flex flex-wrap gap-2">
+                        <span class="chip">@problem.Quiz.AnswerKind.Label()</span>
+                        <span class="chip">Σ = {@string.Join(", ", problem.Quiz.Alphabet.ToCharArray())}</span>
+                    </div>
+                    <span class="@(problem.ReferenceChecked ? "badge-pass" : "badge-warn")">@(problem.ReferenceChecked ? "Verified by ProfAlan" : "Unverified")</span>
+                </div>
+                <div class="space-y-5 p-5">
+                    <div>
+                        <h2 class="font-display text-2xl">@problem.Quiz.Title</h2>
+                        <p class="mt-2 leading-relaxed">@problem.Quiz.Prompt</p>
+                    </div>
+
+                    @foreach (var note in problem.Notes)
+                    {
+                        <p class="flex items-start gap-2 text-xs text-muted"><Icon Name="info" Class="mt-0.5 size-3.5" /> @note</p>
+                    }
+
+                    <details class="rounded-lg border border-line px-4 py-3">
+                        <summary class="cursor-pointer text-sm font-medium">Hint</summary>
+                        <p class="mt-2 text-sm text-muted">@problem.Hint</p>
+                    </details>
+                    <details class="rounded-lg border border-line px-4 py-3">
+                        <summary class="cursor-pointer text-sm font-medium">Reference answer (spoiler)</summary>
+                        <p class="mt-2 whitespace-pre-line font-mono text-sm">@problem.ReferenceAnswer</p>
+                    </details>
+
+                    <div class="overflow-hidden rounded-lg border border-line">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-soft text-xs text-muted">
+                                <tr><th class="px-4 py-2 font-medium">Input</th><th class="px-4 py-2 font-medium">Expected</th><th class="px-4 py-2 font-medium">Visibility</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var c in problem.Cases)
+                                {
+                                    <tr class="border-t border-line">
+                                        <td class="px-4 py-1.5 font-mono">@Symbols.Show(c.Input)</td>
+                                        <td class="px-4 py-1.5 font-medium @(c.ShouldAccept ? "text-pass" : "text-fail")">@(c.ShouldAccept ? "Accept" : "Reject")</td>
+                                        <td class="px-4 py-1.5 text-muted">@(c.IsHidden ? "Hidden" : "Visible")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                        <a href="@SandboxHref" class="btn"><Icon Name="flask" /> Practice in the sandbox</a>
+                        <button type="button" class="btn btn-primary" @onclick="SaveAsQuiz"><Icon Name="save" /> Turn into a quiz</button>
+                    </div>
+                </div>
+            </article>
+        }
+        else if (mode == "explain" && explanation is not null)
+        {
+            <article class="card space-y-5 p-5">
+                <div>
+                    <p class="eyebrow">Language</p>
+                    <p class="mt-1 font-mono">@explainedText</p>
+                </div>
+                <p class="font-display text-xl leading-snug">@explanation.Summary</p>
+                <p class="whitespace-pre-line leading-relaxed">@explanation.Explanation</p>
+                <div class="grid gap-4 sm:grid-cols-2">
+                    @ExampleList("In the language", explanation.Members, expected: true)
+                    @ExampleList("Not in the language", explanation.NonMembers, expected: false)
+                </div>
+                @if (explainOracle is not null)
+                {
+                    <p class="flex items-start gap-2 text-xs text-muted"><Icon Name="info" Class="mt-0.5 size-3.5" /> Each example was re-checked by ProfAlan's own engine; a red mark means the AI got that example wrong.</p>
+                }
+            </article>
+        }
+        else if (!busy)
+        {
+            <EmptyState IconName="wand" Title="Generate a practice problem"
+                        Message="Gemini drafts the language, a reference answer and a test suite. ProfAlan re-checks every expected verdict against the reference before you use it." />
+        }
+        else
+        {
+            <div class="grid min-h-[30vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+        }
+    </div>
+</div>
+
+@code {
+    private string? savedKey;
+    private bool remembered;
+    private string keyInput = "";
+    private bool remember;
+    private bool showKey;
+    private string model = GeminiClient.SuggestedModels[0];
+    private string mode = "problem";
+    private AnswerKind answerKind = AnswerKind.Dfa;
+    private string difficulty = "midterm level";
+    private string alphabet = "ab";
+    private string topic = "";
+    private string languageText = "";
+    private string explainedText = "";
+    private bool busy;
+    private string? error;
+    private VerifiedProblem? problem;
+    private LanguageExplanation? explanation;
+    private Func<string, bool>? explainOracle;
+    private readonly CancellationTokenSource cancel = new();
+
+    private string Masked => savedKey is { Length: > 8 } k ? $"{k[..4]}{new string('•', 12)}{k[^4..]}" : "••••";
+
+    private string SandboxHref => problem?.Quiz.AnswerKind switch
+    {
+        AnswerKind.Regex => "sandbox?kind=regex",
+        AnswerKind.Grammar => "sandbox?kind=cfg",
+        { } kind => $"sandbox?kind={kind.Machine()!.Value.Slug()}",
+        _ => "sandbox"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        (savedKey, remembered) = await Vault.LoadAsync();
+    }
+
+    private async Task SaveKeyAsync()
+    {
+        await Vault.SaveAsync(keyInput, remember);
+        savedKey = keyInput.Trim();
+        remembered = remember;
+        keyInput = "";
+    }
+
+    private async Task ForgetKeyAsync()
+    {
+        await Vault.ClearAsync();
+        savedKey = null;
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (savedKey is null) return;
+        busy = true;
+        error = null;
+        try
+        {
+            var generated = await Gemini.GenerateProblemAsync(savedKey, model,
+                new GenerationRequest(string.IsNullOrWhiteSpace(topic) ? "any classic topic" : topic, answerKind.Label(), difficulty, alphabet), cancel.Token);
+            problem = ProblemVerifier.Verify(generated with { AnswerKind = answerKind.ToString() });
+        }
+        catch (GeminiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task ExplainAsync()
+    {
+        if (savedKey is null) return;
+        busy = true;
+        error = null;
+        try
+        {
+            explanation = await Gemini.ExplainLanguageAsync(savedKey, model, languageText, cancel.Token);
+            explainedText = languageText;
+            explainOracle = QuizGrader.ReferenceOracle(languageText, out _);
+        }
+        catch (GeminiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private RenderFragment ExampleList(string heading, IReadOnlyList<string> words, bool expected) => __builder =>
+    {
+        <div>
+            <p class="label">@heading</p>
+            <ul class="flex flex-wrap gap-1.5">
+                @foreach (var w in words)
+                {
+                    var word = Symbols.IsEmpty(w) ? "" : w.Trim();
+                    var wrong = explainOracle is not null && explainOracle(word) != expected;
+                    <li class="@($"chip {(wrong ? "border-fail text-fail line-through" : "")}")" title="@(wrong ? "ProfAlan disagrees with this example" : "")">@Symbols.Show(word)</li>
+                }
+            </ul>
+        </div>
+    };
+
+    private void SaveAsQuiz()
+    {
+        if (problem is null) return;
+        Pending.Offer(problem.Quiz, problem.Cases);
+        Navigation.NavigateTo(Auth.Current is null ? "login?returnUrl=quizzes%2Fcreate" : "quizzes/create");
+    }
+
+    public void Dispose()
+    {
+        cancel.Cancel();
+        cancel.Dispose();
+    }
+}
