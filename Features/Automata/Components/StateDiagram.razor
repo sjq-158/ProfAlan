@@ -22,7 +22,7 @@
 
     <div class="relative min-h-0 flex-1">
         <div class="h-full outline-none" tabindex="@(ReadOnly ? -1 : 0)" @onkeydown="OnKeyDown">
-        <svg @ref="svg" viewBox="0 0 @F(Width) @F(Height)" preserveAspectRatio="xMidYMid meet"
+        <svg @ref="svg" viewBox="@ViewBox" preserveAspectRatio="xMidYMid meet"
              class="@($"block h-full w-full select-none text-ink {(tool == DiagramTool.State && !ReadOnly ? "cursor-crosshair" : "")}")"
              @onpointermove="OnPointerMove" @onpointerup="OnCanvasPointerUp" @onpointerleave="OnCanvasPointerUp">
             <defs>
@@ -151,6 +151,20 @@
         Verdict.Rejected or Verdict.DidNotHalt => "var(--color-fail)",
         _ => "var(--pa-ink)"
     };
+
+    /// <summary>The editor keeps a fixed canvas; read-only previews zoom to fit their states.</summary>
+    private string ViewBox
+    {
+        get
+        {
+            if (!ReadOnly || Machine.States.Count == 0) return $"0 0 {F(Width)} {F(Height)}";
+            var minX = Machine.States.Min(s => s.X) - Radius - 60;
+            var maxX = Machine.States.Max(s => s.X) + Radius + 50;
+            var minY = Machine.States.Min(s => s.Y) - Radius - 85;
+            var maxY = Machine.States.Max(s => s.Y) + Radius + 85;
+            return $"{F(minX)} {F(minY)} {F(maxX - minX)} {F(maxY - minY)}";
+        }
+    }
 
     private string Hint => tool switch
     {
