@@ -1,13 +1,114 @@
 # ProfAlan
 
-Interactive visualizer for the theory of computation: DFA, NFA, PDA, Turing Machine and CFG.
+An automata theory and formal languages studio for learning, simulation and assessment.
+Build DFAs, NFAs, PDAs and Turing machines graphically or as transition tables, step through
+every configuration, check grammars and regular expressions, and solve CodeChum-style problems
+graded against visible and hidden test cases.
 
-Built with Blazor WebAssembly and Tailwind CSS v4.
+All definitions, configurations and acceptance conditions follow Lewis & Papadimitriou,
+*Elements of the Theory of Computation*, 2nd edition.
 
-## Run locally
+Built with Blazor WebAssembly (.NET 10), Tailwind CSS v4 and Supabase (PostgreSQL + Auth).
+
+## Features
+
+| Area | Route | What it does |
+| --- | --- | --- |
+| Landing | `/` | Introduction, a live DFA preview, links into every area |
+| Auth | `/login`, `/register` | Supabase email/password auth with Student and Instructor roles |
+| Dashboard | `/dashboard` | Saved machines, problems to solve or authored, recent simulation runs |
+| Sandbox | `/sandbox` | Graphical and tabular builders, step-by-step visualizer, DFA/NFA/PDA/TM/CFG/Regex checkers |
+| Quiz Arena | `/quizzes`, `/quizzes/create`, `/quizzes/{id}/solve` | Problems with visible and hidden test cases and automatic grading |
+| Study Area | `/study`, `/study/practice` | Theory notes with runnable examples, plus a bring-your-own-key Gemini practice generator |
+
+Formal conventions in the engines:
+
+- **DFA** `M = (K, Σ, δ, s, F)` with δ total. A partial δ is reported as an error, and the checker can add a trap state.
+- **NFA** `Δ ⊆ K × Σ* × K`, so an arrow may read a whole string or e.
+- **PDA** `M = (K, Σ, Γ, Δ, s, F)`. Accepts iff `(s, w, e) ⊢* (p, e, e)` with `p ∈ F`, which means final state *and* empty stack.
+- **TM** `M = (K, Σ, δ, s, H)`. The tape starts as `▷⊔w` with the head on the blank, and δ must move → on ▷. When one halting state is marked accepting (y) the machine decides; otherwise halting means acceptance.
+- **TM arrow labels** follow the class notation from the midterm review: `σ/b` writes b and `σ/→`, `σ/←` move. Every rule on an arrow is stacked as its own line.
+- **Regex** accepts `∪`, `+` or `|` for union, `e` for the empty string and `∅` for the empty language.
+- **CFG** variables are A–Z and the first left-hand side is the start symbol. Membership is decided with an Earley parser.
+
+## Running locally
+
+Prerequisites: .NET 10 SDK and Node.js 20+.
 
 ```bash
-npm install
-npm run css:watch
-dotnet watch
+npm install        # Tailwind CLI; the build also runs this if node_modules is missing
+dotnet watch       # builds the CSS, then serves http://localhost:5039
 ```
+
+With an empty `wwwroot/appsettings.json` the app runs in **demo mode**: accounts, saved
+machines, quizzes and submissions are kept in the browser's localStorage, and five starter
+problems are seeded. That is enough to try the whole student and instructor loop on one machine.
+
+### Connecting Supabase
+
+1. Create a Supabase project.
+2. Run [`supabase/migrations/20261127000000_profalan_schema.sql`](supabase/migrations/20261127000000_profalan_schema.sql), then optionally [`supabase/seed.sql`](supabase/seed.sql), in the SQL editor (or use `supabase db push`).
+3. Put the project URL and anon key in `wwwroot/appsettings.json`:
+
+   ```json
+   { "Supabase": { "Url": "https://YOUR-PROJECT.supabase.co", "AnonKey": "YOUR-ANON-KEY" } }
+   ```
+
+The anon key is public by design. Row level security protects the data:
+
+- Users only see their own machines and runs.
+- Only instructors can publish quizzes. Students' problems stay private.
+- Hidden test cases can be read only by the quiz author. Solvers receive them only through the `grading_cases` function at submit time.
+- Students see their own submissions. Authors see every submission to their quizzes.
+
+### Gemini (Study Area)
+
+Paste your own key from [Google AI Studio](https://aistudio.google.com) into the Study Area.
+It is kept in `sessionStorage`, or in `localStorage` if you tick "remember". It is sent only to
+Google's API and never to Supabase. Before anything generated can become a quiz, every expected
+verdict is recomputed from the generated reference regex or grammar.
+
+## Tests
+
+```bash
+dotnet test tests/ProfAlan.Tests
+```
+
+The domain layer is plain C#, so the test project compiles it directly. The tests cover the DFA, NFA, PDA and TM engines, regex parsing and equivalence, Earley membership, leftmost derivations and the grammar-to-PDA construction.
+
+## Project structure
+
+The code is organised as vertical slices by feature. The formal machinery sits in a framework-free `Domain` layer.
+
+```
+Domain/                     Pure C#: no Blazor, no I/O
+  Automata/                 Automaton model, DfaEngine, NfaEngine, PdaEngine, TuringEngine, Tape
+  Regular/                  RegexParser, EpsilonNfa (Thompson), LanguageComparer
+  Grammars/                 ContextFreeGrammar, EarleyRecognizer, DerivationTracer, GrammarToPda
+Features/
+  Auth/                     Pages, AuthSession (AuthenticationStateProvider), Supabase and demo gateways
+  Automata/                 Sandbox page, StateDiagram, TransitionGrid, ExecutionPanel, checkers, library storage
+  Quizzes/                  Quiz list/editor/solve pages, QuizGrader.EvaluateTestCases, repositories
+  StudyArea/                Study page, TheoryNotes, GeminiClient, ProblemVerifier, ApiKeyVault
+  Dashboard/  Home/         Dashboard and landing pages
+Shared/                     Layouts, nav bar, icons, palettes, toasts, browser storage, Supabase REST client
+supabase/                   Schema migration with RLS, seed data
+tests/ProfAlan.Tests/       xUnit tests for the domain layer
+```
+
+Each slice keeps its own `Pages/`, `Components/`, `Services/` and `Models/` folders.
+
+## Design
+
+- Palettes, switchable from the palette button: Platinum / French Gray / Gunmetal (default), Blue / Butter / Chocopie, Wine / Milk / Heavenly, and Link Water / Gull Grey / Blue Jay.
+- Type: Cooper BT for display headings, Inter for UI text, Fira Code for alphabets, tuples, states and tapes. Cooper BT is a commercial font and is used when it is installed locally; otherwise headings fall back to Cooper Black, then Fraunces.
+- All icons are inline SVG.
+
+## Known limitations
+
+- Grading runs in the browser. Hidden strings never appear in the UI, but they do reach the solver's browser during grading, and submitted scores are computed client-side. For high-stakes exams, move `QuizGrader` into a Supabase Edge Function.
+- The Student/Instructor role is chosen at sign-up. A production deployment should approve instructors.
+
+## Commit convention
+
+Commits follow [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `feat(scope): …`, `fix(scope): …`, `refactor`, `test`, `docs`, `build` and `chore`.
