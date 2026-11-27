@@ -29,7 +29,6 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddScoped<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
 builder.Services.AddScoped<SandboxDrafts>();
 builder.Services.AddScoped<PendingQuizDraft>();
-builder.Services.AddScoped<ApiKeyVault>();
 builder.Services.AddScoped<GeminiClient>();
 
 if (supabase.IsConfigured)

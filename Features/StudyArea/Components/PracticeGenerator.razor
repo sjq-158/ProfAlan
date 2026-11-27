@@ -2,7 +2,6 @@
 @using ProfAlan.Features.StudyArea.Models
 @using ProfAlan.Features.StudyArea.Services
 @implements IDisposable
-@inject ApiKeyVault Vault
 @inject GeminiClient Gemini
 @inject PendingQuizDraft Pending
 @inject AuthSession Auth
@@ -17,81 +16,21 @@
                 {
                     <span class="badge-pass"><Icon Name="check" Class="size-3" /> Ready</span>
                 }
+                else
+                {
+                    <span class="badge-warn">Unavailable</span>
+                }
             </div>
-            <div class="space-y-3 p-4">
-                @if (Gemini.HasProjectAssistant)
+            <div class="space-y-3 p-4 text-sm">
+                <p class="leading-relaxed">Powered by Google Gemini on the free tier and hosted by ProfAlan, so you can use it right away without an API key.</p>
+                <p class="flex gap-2 text-xs text-muted">
+                    <Icon Name="shield" Class="mt-0.5 size-3.5" />
+                    <span>Requests go through ProfAlan's server, which keeps the project key secret. Your prompt is sent to Google to generate the answer.</span>
+                </p>
+                @if (!Ready)
                 {
-                    <p class="text-sm leading-relaxed">Powered by Google Gemini on the free tier, hosted by ProfAlan. No API key is needed.</p>
-                    @if (Auth.Current is null)
-                    {
-                        <a href="login?returnUrl=study%2Fpractice" class="btn btn-primary w-full"><Icon Name="user" /> Sign in to use the assistant</a>
-                    }
-                    <p class="flex gap-2 text-xs text-muted">
-                        <Icon Name="shield" Class="mt-0.5 size-3.5" />
-                        <span>Requests go through ProfAlan's server, which keeps the API key secret. Your prompts are sent to Google to generate answers.</span>
-                    </p>
-                    <details class="rounded-lg border border-line px-3 py-2" open="@(savedKey is not null)">
-                        <summary class="cursor-pointer text-sm font-medium">Use your own Gemini key instead</summary>
-                        <div class="mt-3 space-y-3">
-                            @if (savedKey is null)
-                            {
-                                <div class="relative">
-                                    <input type="@(showKey ? "text" : "password")" class="field field-mono pr-10" @bind="keyInput" placeholder="AIza..." autocomplete="off" aria-label="Gemini API key" />
-                                    <button type="button" class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-ink" aria-label="@(showKey ? "Hide key" : "Show key")" @onclick="() => showKey = !showKey">
-                                        <Icon Name="@(showKey ? "eye-off" : "eye")" />
-                                    </button>
-                                </div>
-                                <label class="flex items-center gap-2 text-sm">
-                                    <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" @bind="remember" /> Remember on this device
-                                </label>
-                                <button type="button" class="btn btn-primary w-full" disabled="@string.IsNullOrWhiteSpace(keyInput)" @onclick="SaveKeyAsync"><Icon Name="key" /> Use this key</button>
-                            }
-                            else
-                            {
-                                <p class="font-mono text-sm">@Masked</p>
-                                <p class="text-xs text-muted">@(remembered ? "Stored in this browser's localStorage." : "Stored for this tab only (sessionStorage).")</p>
-                                <button type="button" class="btn w-full" @onclick="ForgetKeyAsync"><Icon Name="trash" /> Forget key</button>
-                            }
-                            <p class="text-xs text-muted">Your key stays in this browser and is sent only to Google. ProfAlan never stores it.</p>
-                        </div>
-                    </details>
+                    <p class="text-xs text-warn">The assistant needs the Supabase connection, which is not configured in this copy of the app.</p>
                 }
-                else
-                {
-                @if (savedKey is null)
-                {
-                    <div class="relative">
-                        <input type="@(showKey ? "text" : "password")" class="field field-mono pr-10" @bind="keyInput" placeholder="AIza..." autocomplete="off" aria-label="Gemini API key" />
-                        <button type="button" class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted hover:text-ink" aria-label="@(showKey ? "Hide key" : "Show key")" @onclick="() => showKey = !showKey">
-                            <Icon Name="@(showKey ? "eye-off" : "eye")" />
-                        </button>
-                    </div>
-                    <label class="flex items-center gap-2 text-sm">
-                        <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" @bind="remember" /> Remember on this device
-                    </label>
-                    <button type="button" class="btn btn-primary w-full" disabled="@string.IsNullOrWhiteSpace(keyInput)" @onclick="SaveKeyAsync"><Icon Name="key" /> Use this key</button>
-                }
-                else
-                {
-                    <p class="font-mono text-sm">@Masked</p>
-                    <p class="text-xs text-muted">@(remembered ? "Stored in this browser's localStorage." : "Stored for this tab only (sessionStorage).")</p>
-                    <button type="button" class="btn w-full" @onclick="ForgetKeyAsync"><Icon Name="trash" /> Forget key</button>
-                }
-                    <p class="flex gap-2 text-xs text-muted">
-                        <Icon Name="shield" Class="mt-0.5 size-3.5" />
-                        <span>No project assistant is configured, so add your own free key from Google AI Studio. It stays in your browser and is sent only to Google.</span>
-                    </p>
-                }
-                <div>
-                    <label class="label" for="gemini-model">Model</label>
-                    <input id="gemini-model" class="field field-mono" list="gemini-models" @bind="model" />
-                    <datalist id="gemini-models">
-                        @foreach (var m in GeminiClient.SuggestedModels)
-                        {
-                            <option value="@m"></option>
-                        }
-                    </datalist>
-                </div>
             </div>
         </section>
 
@@ -150,7 +89,7 @@
                 }
                 @if (!Ready)
                 {
-                    <p class="text-xs text-muted">@(Gemini.HasProjectAssistant ? "Sign in to enable generation." : "Add your API key above to enable generation.")</p>
+                    <p class="text-xs text-muted">The AI assistant is unavailable in this copy of the app.</p>
                 }
             </div>
         </section>
@@ -249,12 +188,6 @@
 </div>
 
 @code {
-    private string? savedKey;
-    private bool remembered;
-    private string keyInput = "";
-    private bool remember;
-    private bool showKey;
-    private string model = GeminiClient.SuggestedModels[0];
     private string mode = "problem";
     private AnswerKind answerKind = AnswerKind.Dfa;
     private string difficulty = "midterm level";
@@ -269,9 +202,8 @@
     private Func<string, bool>? explainOracle;
     private readonly CancellationTokenSource cancel = new();
 
-    private bool Ready => savedKey is not null || (Gemini.HasProjectAssistant && Auth.Current is not null);
+    private bool Ready => Gemini.HasProjectAssistant;
 
-    private string Masked => savedKey is { Length: > 8 } k ? $"{k[..4]}{new string('•', 12)}{k[^4..]}" : "••••";
 
     private string SandboxHref => problem?.Quiz.AnswerKind switch
     {
@@ -281,25 +213,6 @@
         _ => "sandbox"
     };
 
-    protected override async Task OnInitializedAsync()
-    {
-        (savedKey, remembered) = await Vault.LoadAsync();
-    }
-
-    private async Task SaveKeyAsync()
-    {
-        await Vault.SaveAsync(keyInput, remember);
-        savedKey = keyInput.Trim();
-        remembered = remember;
-        keyInput = "";
-    }
-
-    private async Task ForgetKeyAsync()
-    {
-        await Vault.ClearAsync();
-        savedKey = null;
-    }
-
     private async Task GenerateAsync()
     {
         if (!Ready) return;
@@ -307,7 +220,7 @@
         error = null;
         try
         {
-            var generated = await Gemini.GenerateProblemAsync(savedKey, model,
+            var generated = await Gemini.GenerateProblemAsync(
                 new GenerationRequest(string.IsNullOrWhiteSpace(topic) ? "any classic topic" : topic, answerKind.Label(), difficulty, alphabet), cancel.Token);
             problem = ProblemVerifier.Verify(generated with { AnswerKind = answerKind.ToString() });
         }
@@ -331,7 +244,7 @@
         error = null;
         try
         {
-            explanation = await Gemini.ExplainLanguageAsync(savedKey, model, languageText, cancel.Token);
+            explanation = await Gemini.ExplainLanguageAsync(languageText, cancel.Token);
             explainedText = languageText;
             explainOracle = QuizGrader.ReferenceOracle(languageText, out _);
         }

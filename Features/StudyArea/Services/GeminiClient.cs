@@ -10,14 +10,11 @@ public sealed class GeminiException(string message) : Exception(message);
 
 /// <summary>
 /// Asks Gemini for JSON that matches a response schema, so the output can be checked by
-/// ProfAlan's engines. By default requests go through the project's gemini Edge Function,
-/// which holds the free-tier key as a server secret; a user may instead supply their own key,
-/// which is sent straight to Google.
+/// ProfAlan's engines. Every request goes through the project's gemini Edge Function, which
+/// holds the free-tier key as a server secret, so users never need a key of their own.
 /// </summary>
 public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAccessTokenSource tokens)
 {
-    public static readonly IReadOnlyList<string> SuggestedModels = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
-
     /// <summary>True when the project-hosted assistant can be used (a Supabase project is configured).</summary>
     public bool HasProjectAssistant => supabase.IsConfigured;
 
@@ -28,7 +25,7 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public async Task<GeneratedProblem> GenerateProblemAsync(string? apiKey, string model, GenerationRequest request, CancellationToken cancel = default)
+    public async Task<GeneratedProblem> GenerateProblemAsync(GenerationRequest request, CancellationToken cancel = default)
     {
         var sigma = string.Join(", ", request.Alphabet.ToCharArray());
         var prompt = $$"""
@@ -68,10 +65,10 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
             required = new[] { "title", "prompt", "answerKind", "alphabet", "referenceAnswer", "hint", "testCases" }
         };
 
-        return await AskAsync<GeneratedProblem>(apiKey, model, prompt, schema, 0.9, cancel);
+        return await AskAsync<GeneratedProblem>(prompt, schema, 0.9, cancel);
     }
 
-    public async Task<LanguageExplanation> ExplainLanguageAsync(string? apiKey, string model, string language, CancellationToken cancel = default)
+    public async Task<LanguageExplanation> ExplainLanguageAsync(string language, CancellationToken cancel = default)
     {
         var prompt = $"""
             Explain, for an automata theory student, the language described by: {language}
@@ -95,10 +92,10 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
             required = new[] { "summary", "explanation", "members", "nonMembers" }
         };
 
-        return await AskAsync<LanguageExplanation>(apiKey, model, prompt, schema, 0.4, cancel);
+        return await AskAsync<LanguageExplanation>(prompt, schema, 0.4, cancel);
     }
 
-    private async Task<T> AskAsync<T>(string? apiKey, string model, string prompt, object schema, double temperature, CancellationToken cancel)
+    private async Task<T> AskAsync<T>(string prompt, object schema, double temperature, CancellationToken cancel)
     {
         var body = new
         {
@@ -106,9 +103,7 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
             generationConfig = new { responseMimeType = "application/json", responseSchema = schema, temperature }
         };
 
-        using var request = string.IsNullOrWhiteSpace(apiKey)
-            ? await ProjectRequestAsync(model, body)
-            : DirectRequest(apiKey, model, body);
+        using var request = await ProjectRequestAsync(body);
 
         HttpResponseMessage response;
         try
@@ -138,28 +133,16 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
         }
     }
 
-    private async Task<HttpRequestMessage> ProjectRequestAsync(string model, object body)
+    private async Task<HttpRequestMessage> ProjectRequestAsync(object body)
     {
-        if (!supabase.IsConfigured) throw new GeminiException("The project assistant needs Supabase. Add your own Gemini key instead.");
-        var token = await tokens.GetAccessTokenAsync() ?? throw new GeminiException("Sign in to use the AI assistant.");
+        if (!supabase.IsConfigured) throw new GeminiException("The AI assistant needs the Supabase connection, which is not configured here.");
 
         var request = new HttpRequestMessage(HttpMethod.Post, $"{supabase.Url.TrimEnd('/')}/functions/v1/gemini")
         {
-            Content = JsonContent.Create(new { model = model.Trim(), request = body })
+            Content = JsonContent.Create(new { request = body })
         };
         request.Headers.Add("apikey", supabase.AnonKey);
-        request.Headers.Authorization = new("Bearer", token);
-        return request;
-    }
-
-    private static HttpRequestMessage DirectRequest(string apiKey, string model, object body)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post,
-            $"https://generativelanguage.googleapis.com/v1beta/models/{Uri.EscapeDataString(model.Trim())}:generateContent")
-        {
-            Content = JsonContent.Create(body)
-        };
-        request.Headers.Add("x-goog-api-key", apiKey.Trim());
+        if (await tokens.GetAccessTokenAsync() is { } token) request.Headers.Authorization = new("Bearer", token);
         return request;
     }
 
@@ -177,12 +160,11 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
 
         return status switch
         {
-            HttpStatusCode.BadRequest when message?.Contains("API key", StringComparison.OrdinalIgnoreCase) == true => "Gemini rejected the API key. Check that it is correct and enabled.",
-            HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized => "The request was not authorised. Sign in again, or check that your own key is enabled for the Gemini API.",
-            HttpStatusCode.NotFound when message is null => "The AI assistant is not deployed on this Supabase project yet. Run npm run ai:deploy, or use your own key.",
-            HttpStatusCode.NotFound => "That model name was not found. Pick one of the suggested models.",
+            HttpStatusCode.BadRequest when message?.Contains("API key", StringComparison.OrdinalIgnoreCase) == true => "The project's Gemini key was rejected. Ask the maintainer to update it.",
+            HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized => "The AI assistant refused the request. Try again in a moment.",
+            HttpStatusCode.NotFound => "The AI assistant is not deployed on this Supabase project yet (npm run ai:deploy).",
             HttpStatusCode.ServiceUnavailable => message ?? "The AI assistant is not configured on the server yet.",
-            HttpStatusCode.TooManyRequests => "The key's rate limit or quota was reached. Wait a moment and try again.",
+            HttpStatusCode.TooManyRequests => "The free-tier rate limit was reached. Wait a minute and try again.",
             _ => message ?? $"Gemini returned an error ({(int)status})."
         };
     }
