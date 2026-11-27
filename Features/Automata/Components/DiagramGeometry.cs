@@ -44,7 +44,7 @@ public static class DiagramGeometry
 
             if (a == b)
             {
-                yield return Loop(a, rules, labels);
+                yield return Loop(machine, a, rules, labels);
                 continue;
             }
 
@@ -64,17 +64,67 @@ public static class DiagramGeometry
         return rules.Select(r => (r.Label(kind), (string?)r.Id)).ToList();
     }
 
-    private static EdgeShape Loop(StateNode s, List<TransitionRule> rules, List<(string Text, string? RuleId)> labels)
+    private static EdgeShape Loop(Automaton machine, StateNode s, List<TransitionRule> rules, List<(string Text, string? RuleId)> labels)
     {
-        var dx = Radius * 0.5;
-        var dy = Radius * 0.866;
-        var path = $"M {F(s.X - dx)} {F(s.Y - dy)} C {F(s.X - 46)} {F(s.Y - 92)}, {F(s.X + 46)} {F(s.Y - 92)}, {F(s.X + dx)} {F(s.Y - dy)}";
+        var angle = FreeDirection(machine, s);
+        var (ux, uy) = (Math.Cos(angle), Math.Sin(angle));
 
-        var baseY = s.Y - 80;
-        var lines = labels
-            .Select((l, i) => new EdgeLabelLine(l.Text, l.RuleId, s.X, baseY - (labels.Count - 1 - i) * LineHeight))
+        (double X, double Y) At(double offset, double distance) =>
+            (s.X + Math.Cos(angle + offset) * distance, s.Y + Math.Sin(angle + offset) * distance);
+
+        var start = At(-0.52, Radius);
+        var end = At(0.52, Radius);
+        var c1 = At(-0.62, Radius + 70);
+        var c2 = At(0.62, Radius + 70);
+        var path = $"M {F(start.X)} {F(start.Y)} C {F(c1.X)} {F(c1.Y)}, {F(c2.X)} {F(c2.Y)}, {F(end.X)} {F(end.Y)}";
+
+        var lx = s.X + ux * (Radius + 62);
+        var ly = s.Y + uy * (Radius + 62);
+        string anchor;
+        List<EdgeLabelLine> lines;
+        if (Math.Abs(ux) > 0.7)
+        {
+            anchor = ux > 0 ? "start" : "end";
+            var top = ly - (labels.Count - 1) * LineHeight / 2 + 4;
+            lines = labels.Select((l, i) => new EdgeLabelLine(l.Text, l.RuleId, lx + ux * 4, top + i * LineHeight)).ToList();
+        }
+        else
+        {
+            anchor = "middle";
+            lines = uy < 0
+                ? labels.Select((l, i) => new EdgeLabelLine(l.Text, l.RuleId, lx, ly - (labels.Count - 1 - i) * LineHeight)).ToList()
+                : labels.Select((l, i) => new EdgeLabelLine(l.Text, l.RuleId, lx, ly + 10 + i * LineHeight)).ToList();
+        }
+        return new EdgeShape(s.Name, s.Name, rules, path, anchor, lines);
+    }
+
+    /// <summary>Picks up, down, right or left for a self-loop, whichever is furthest from the state's other arrows.</summary>
+    private static double FreeDirection(Automaton machine, StateNode s)
+    {
+        var neighbourAngles = machine.Transitions
+            .Where(t => (t.From == s.Name) != (t.To == s.Name))
+            .Select(t => machine.FindState(t.From == s.Name ? t.To : t.From))
+            .OfType<StateNode>()
+            .Distinct()
+            .Select(n => Math.Atan2(n.Y - s.Y, n.X - s.X))
             .ToList();
-        return new EdgeShape(s.Name, s.Name, rules, path, "middle", lines);
+        if (s.IsInitial) neighbourAngles.Add(Math.PI);
+
+        double[] candidates = [-Math.PI / 2, Math.PI / 2, 0, Math.PI];
+        if (neighbourAngles.Count == 0) return candidates[0];
+
+        static double Gap(double a, double b)
+        {
+            var d = Math.Abs(a - b) % (2 * Math.PI);
+            return d > Math.PI ? 2 * Math.PI - d : d;
+        }
+
+        return candidates
+            .Select((c, i) => (Angle: c, Clearance: neighbourAngles.Min(n => Gap(c, n)), Order: i))
+            .OrderByDescending(x => Math.Round(x.Clearance, 2) >= 1.2 ? 1 : 0)
+            .ThenBy(x => Math.Round(x.Clearance, 2) >= 1.2 ? x.Order : 0)
+            .ThenByDescending(x => x.Clearance)
+            .First().Angle;
     }
 
     private static EdgeShape Arc(StateNode a, StateNode b, List<TransitionRule> rules, List<(string Text, string? RuleId)> labels, double bend)
