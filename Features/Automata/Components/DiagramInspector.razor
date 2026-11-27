@@ -1,0 +1,230 @@
+<div class="card shadow-lg" @onpointerdown:stopPropagation="true">
+    <div class="card-header py-2.5">
+        <p class="font-mono text-sm font-medium">
+            @if (State is { } s)
+            {
+                <span>State @s.Name</span>
+            }
+            else if (Edge is { } e)
+            {
+                <span>@e.From → @e.To</span>
+            }
+        </p>
+        <button type="button" class="text-muted hover:text-ink" aria-label="Close inspector" @onclick="OnClose">
+            <Icon Name="x" />
+        </button>
+    </div>
+
+    <div class="max-h-[22rem] overflow-y-auto p-4 text-sm">
+        @if (State is { } state)
+        {
+            <label class="label" for="state-name">Name</label>
+            <input id="state-name" class="field field-mono" value="@state.Name" @onchange="e => RenameAsync(state, e.Value?.ToString())" />
+            @if (renameError is not null)
+            {
+                <p class="mt-1 text-xs text-fail">@renameError</p>
+            }
+
+            <div class="mt-4 flex flex-col gap-2.5">
+                <label class="flex items-center justify-between gap-3">
+                    <span>Initial state <span class="font-mono text-muted">s</span></span>
+                    <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@state.IsInitial" disabled="@state.IsInitial"
+                           @onchange="() => UpdateAsync(() => Machine.MakeInitial(state))" />
+                </label>
+
+                @if (Machine.Kind == MachineKind.Turing)
+                {
+                    <label class="flex items-center justify-between gap-3">
+                        <span>Halting state <span class="font-mono text-muted">∈ H</span></span>
+                        <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@state.IsHalting"
+                               @onchange="e => SetHaltingAsync(state, (bool)e.Value!)" />
+                    </label>
+                    <label class="@($"flex items-center justify-between gap-3 {(state.IsHalting ? "" : "opacity-40")}")">
+                        <span>Accepting halt <span class="font-mono text-muted">(y)</span></span>
+                        <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@state.IsFinal" disabled="@(!state.IsHalting)"
+                               @onchange="e => UpdateAsync(() => state.IsFinal = (bool)e.Value!)" />
+                    </label>
+                    <p class="text-xs text-muted">Mark one halting state as y to decide a language; leave all unmarked to semidecide.</p>
+                }
+                else
+                {
+                    <label class="flex items-center justify-between gap-3">
+                        <span>Final state <span class="font-mono text-muted">∈ F</span></span>
+                        <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" checked="@state.IsFinal"
+                               @onchange="e => UpdateAsync(() => state.IsFinal = (bool)e.Value!)" />
+                    </label>
+                }
+            </div>
+
+            <button type="button" class="btn btn-danger mt-4 w-full" @onclick="() => DeleteStateAsync(state)">
+                <Icon Name="trash" /> Delete state
+            </button>
+        }
+        else if (Edge is { } edge)
+        {
+            var rules = Machine.Transitions.Where(t => t.From == edge.From && t.To == edge.To).ToList();
+
+            @switch (Machine.Kind)
+            {
+                case MachineKind.Dfa:
+                    <p class="label">Symbols that take @edge.From to @edge.To</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach (var a in Machine.Alphabet.Select(c => c.ToString()))
+                        {
+                            var on = rules.Any(r => r.Read == a);
+                            var elsewhere = Machine.Transitions.FirstOrDefault(t => t.From == edge.From && t.Read == a && t.To != edge.To);
+                            <button type="button" title="@(elsewhere is not null ? $"Currently δ({edge.From}, {a}) = {elsewhere.To}" : "")"
+                                    class="@($"min-w-9 rounded-md border px-2.5 py-1 font-mono transition {(on ? "border-ink bg-ink text-surface" : "border-line hover:bg-soft")}")"
+                                    @onclick="() => ToggleDfaSymbolAsync(edge.From, edge.To, a)">
+                                @a
+                            </button>
+                        }
+                    </div>
+                    <p class="mt-2 text-xs text-muted">A DFA has exactly one δ(@edge.From, σ) per symbol, so choosing a symbol here moves it off any other arrow.</p>
+                    break;
+
+                case MachineKind.Nfa:
+                    <p class="label">Strings u ∈ Σ* on this arrow (e for the empty string)</p>
+                    @foreach (var rule in rules)
+                    {
+                        <div class="mb-2 flex items-center gap-2">
+                            <input class="field field-mono" value="@Symbols.Show(rule.Read)" placeholder="e" @onchange="e => UpdateAsync(() => rule.Read = Symbols.Normalize(e.Value?.ToString()))" />
+                            <button type="button" class="btn-icon shrink-0 text-fail" aria-label="Remove rule" @onclick="() => RemoveRuleAsync(rule)"><Icon Name="x" /></button>
+                        </div>
+                    }
+                    break;
+
+                case MachineKind.Pda:
+                    <div class="mb-1.5 grid grid-cols-[1fr_1fr_1fr_2.25rem] gap-2 text-[11px] text-muted">
+                        <span>read a</span><span>pop β</span><span>push γ</span><span></span>
+                    </div>
+                    @foreach (var rule in rules)
+                    {
+                        <div class="mb-2 grid grid-cols-[1fr_1fr_1fr_2.25rem] items-center gap-2">
+                            <input class="field field-mono px-2" value="@Symbols.Show(rule.Read)" @onchange="e => UpdateAsync(() => rule.Read = Symbols.Normalize(e.Value?.ToString()))" />
+                            <input class="field field-mono px-2" value="@Symbols.Show(rule.Pop)" @onchange="e => UpdateAsync(() => rule.Pop = Symbols.Normalize(e.Value?.ToString()))" />
+                            <input class="field field-mono px-2" value="@Symbols.Show(rule.Push)" @onchange="e => UpdateAsync(() => rule.Push = Symbols.Normalize(e.Value?.ToString()))" />
+                            <button type="button" class="btn-icon text-fail" aria-label="Remove rule" @onclick="() => RemoveRuleAsync(rule)"><Icon Name="x" /></button>
+                        </div>
+                    }
+                    <p class="text-xs text-muted">Each row is ((@edge.From, a, β), (@edge.To, γ)). The stack top is written first.</p>
+                    break;
+
+                case MachineKind.Turing:
+                    <div class="mb-1.5 grid grid-cols-[1fr_1fr_2.25rem] gap-2 text-[11px] text-muted">
+                        <span>read σ</span><span>write b or move</span><span></span>
+                    </div>
+                    @foreach (var rule in rules)
+                    {
+                        <div class="mb-2 grid grid-cols-[1fr_1fr_2.25rem] items-center gap-2">
+                            <input class="field field-mono px-2" maxlength="1" value="@rule.Read" @onchange="e => UpdateAsync(() => rule.Read = NormalizeTapeSymbol(e.Value?.ToString()))" />
+                            <input class="field field-mono px-2" value="@rule.Action" @onchange="e => UpdateAsync(() => rule.Action = Symbols.NormalizeAction(e.Value?.ToString()))" />
+                            <button type="button" class="btn-icon text-fail" aria-label="Remove rule" @onclick="() => RemoveRuleAsync(rule)"><Icon Name="x" /></button>
+                        </div>
+                    }
+                    <div class="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                        <span>Type</span><span class="chip">_ = ⊔</span><span class="chip">L = ←</span><span class="chip">R = →</span>
+                    </div>
+                    break;
+            }
+
+            <div class="mt-4 flex gap-2">
+                @if (Machine.Kind != MachineKind.Dfa)
+                {
+                    <button type="button" class="btn flex-1" @onclick="() => AddRuleAsync(edge.From, edge.To)"><Icon Name="plus" /> Add rule</button>
+                }
+                <button type="button" class="btn btn-danger flex-1" @onclick="() => DeleteEdgeAsync(edge.From, edge.To)"><Icon Name="trash" /> Delete arrow</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public string? StateName { get; set; }
+    [Parameter] public (string From, string To)? Edge { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<string> OnRenamed { get; set; }
+
+    private string? renameError;
+
+    private StateNode? State => StateName is null ? null : Machine.FindState(StateName);
+
+    protected override void OnParametersSet() => renameError = null;
+
+    private static string NormalizeTapeSymbol(string? value) =>
+        string.IsNullOrEmpty(value) ? Symbols.Blank.ToString() : Symbols.NormalizeTapeSymbol(value.Trim()[0]).ToString();
+
+    private async Task UpdateAsync(Action change)
+    {
+        change();
+        await OnChanged.InvokeAsync();
+    }
+
+    private Task SetHaltingAsync(StateNode state, bool halting) => UpdateAsync(() =>
+    {
+        state.IsHalting = halting;
+        if (!halting) state.IsFinal = false;
+    });
+
+    private async Task RenameAsync(StateNode state, string? name)
+    {
+        if (!Machine.RenameState(state, name ?? ""))
+        {
+            renameError = "Names must be unique and not empty.";
+            return;
+        }
+        renameError = null;
+        await OnRenamed.InvokeAsync(state.Name);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DeleteStateAsync(StateNode state)
+    {
+        Machine.RemoveState(state);
+        await OnClose.InvokeAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task ToggleDfaSymbolAsync(string from, string to, string symbol)
+    {
+        var existing = Machine.Transitions.FirstOrDefault(t => t.From == from && t.Read == symbol);
+        if (existing is not null && existing.To == to)
+        {
+            Machine.Transitions.Remove(existing);
+        }
+        else
+        {
+            Machine.Transitions.RemoveAll(t => t.From == from && t.Read == symbol);
+            Machine.Transitions.Add(new TransitionRule { From = from, To = to, Read = symbol });
+        }
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task AddRuleAsync(string from, string to)
+    {
+        var rule = new TransitionRule { From = from, To = to, Read = Machine.Alphabet.Count > 0 ? Machine.Alphabet[0].ToString() : "" };
+        if (Machine.Kind == MachineKind.Turing)
+        {
+            rule.Read = Symbols.Blank.ToString();
+            rule.Action = Symbols.MoveRight;
+        }
+        Machine.Transitions.Add(rule);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task RemoveRuleAsync(TransitionRule rule)
+    {
+        Machine.Transitions.Remove(rule);
+        if (Edge is { } e && !Machine.Transitions.Any(t => t.From == e.From && t.To == e.To)) await OnClose.InvokeAsync();
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task DeleteEdgeAsync(string from, string to)
+    {
+        Machine.Transitions.RemoveAll(t => t.From == from && t.To == to);
+        await OnClose.InvokeAsync();
+        await OnChanged.InvokeAsync();
+    }
+}

@@ -1,0 +1,365 @@
+@using static ProfAlan.Features.Automata.Components.DiagramGeometry
+@inject IJSRuntime JS
+
+<div class="flex h-full flex-col">
+    @if (!ReadOnly)
+    {
+        <div class="flex flex-wrap items-center gap-1.5 border-b border-line px-3 py-2">
+            <div class="flex items-center gap-1 rounded-lg border border-line p-0.5" role="toolbar" aria-label="Canvas tools">
+                @ToolButton(DiagramTool.Select, "pointer", "Select and move (V)")
+                @ToolButton(DiagramTool.State, "state", "Add state (S)")
+                @ToolButton(DiagramTool.Transition, "edge", "Add transition (T)")
+            </div>
+            <button type="button" class="btn btn-ghost px-2.5 py-1.5" title="Arrange states left to right" @onclick="Arrange">
+                <Icon Name="layout" /> <span class="hidden sm:inline">Auto layout</span>
+            </button>
+            <button type="button" class="btn btn-ghost px-2.5 py-1.5 text-fail" title="Delete selection (Del)" disabled="@(selectedState is null && selectedEdge is null)" @onclick="DeleteSelection">
+                <Icon Name="trash" /> <span class="hidden sm:inline">Delete</span>
+            </button>
+            <p class="ml-auto hidden text-xs text-muted lg:block">@Hint</p>
+        </div>
+    }
+
+    <div class="relative min-h-0 flex-1">
+        <div class="h-full outline-none" tabindex="@(ReadOnly ? -1 : 0)" @onkeydown="OnKeyDown">
+        <svg @ref="svg" viewBox="0 0 @F(Width) @F(Height)" preserveAspectRatio="xMidYMid meet"
+             class="@($"block h-full w-full select-none text-ink {(tool == DiagramTool.State && !ReadOnly ? "cursor-crosshair" : "")}")"
+             @onpointermove="OnPointerMove" @onpointerup="OnCanvasPointerUp" @onpointerleave="OnCanvasPointerUp">
+            <defs>
+                <marker id="@($"{id}-arrow")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M0 0 10 5 0 10z" fill="currentColor" />
+                </marker>
+                <marker id="@($"{id}-arrow-active")" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M0 0 10 5 0 10z" fill="currentColor" />
+                </marker>
+            </defs>
+
+            <rect width="100%" height="100%" fill="transparent" @onclick="OnBackgroundClick" />
+
+            @if (Machine.States.Count == 0 && !ReadOnly)
+            {
+                <g>
+                    <text x="@F(Width / 2)" y="@F(Height / 2)" text-anchor="middle" class="fill-current font-sans text-[15px] opacity-50">
+                        Choose "Add state" and click anywhere to place the first state.
+                    </text>
+                </g>
+            }
+
+            @foreach (var edge in DiagramGeometry.Edges(Machine))
+            {
+                var active = ActiveRuleId is not null && edge.Rules.Any(r => r.Id == ActiveRuleId);
+                var selected = selectedEdge == (edge.From, edge.To);
+                <g class="@(ReadOnly ? "" : "cursor-pointer")" @onclick="() => SelectEdge(edge)" @onclick:stopPropagation="true">
+                    <path d="@edge.Path" fill="none" stroke="transparent" stroke-width="16" />
+                    <path d="@edge.Path" fill="none" stroke="currentColor"
+                          stroke-width="@(active ? 2.8 : selected ? 2.4 : 1.5)"
+                          stroke-dasharray="@(selected && !active ? "5 3" : null)"
+                          marker-end="url(#@($"{id}-{(active ? "arrow-active" : "arrow")}"))" />
+                    @foreach (var line in edge.Lines)
+                    {
+                        var lineActive = active && (line.RuleId == ActiveRuleId || line.RuleId is null);
+                        <g>
+                            <text x="@F(line.X)" y="@F(line.Y)" text-anchor="@edge.Anchor"
+                                  class="@($"fill-current font-mono text-[13px] {(lineActive ? "font-semibold" : "")}")"
+                                  paint-order="stroke" stroke="var(--pa-card)" stroke-width="4" stroke-linejoin="round">@line.Text</text>
+                        </g>
+                    }
+                </g>
+            }
+
+            @if (pendingFrom is not null && Machine.FindState(pendingFrom) is { } from)
+            {
+                <line x1="@F(from.X)" y1="@F(from.Y)" x2="@F(pointer.X)" y2="@F(pointer.Y)"
+                      stroke="currentColor" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#@($"{id}-arrow"))" class="pointer-events-none" />
+            }
+
+            @foreach (var s in Machine.States)
+            {
+                var isActive = s.Name == ActiveState;
+                var isSelected = selectedState == s.Name;
+                var ring = isActive ? OutcomeStroke : "currentColor";
+                <g class="@(ReadOnly ? "" : tool == DiagramTool.Transition ? "cursor-cell" : "cursor-grab")"
+                   @onpointerdown="e => OnStatePointerDown(e, s)" @onpointerdown:stopPropagation="true"
+                   @onpointerup="() => OnStatePointerUp(s)" @onpointerup:stopPropagation="true"
+                   @onclick:stopPropagation="true" @ondblclick="() => ToggleFinal(s)">
+                    @if (s.IsInitial)
+                    {
+                        <line x1="@F(s.X - Radius - 40)" y1="@F(s.Y)" x2="@F(s.X - Radius - 1)" y2="@F(s.Y)"
+                              stroke="currentColor" stroke-width="1.6" marker-end="url(#@($"{id}-arrow"))" />
+                    }
+                    @if (isSelected)
+                    {
+                        <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius + 7)" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" opacity="0.7" />
+                    }
+                    <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius)"
+                            fill="@(isActive ? OutcomeFill : "var(--pa-card)")" stroke="@ring"
+                            stroke-width="@(isActive ? 3 : 1.8)" class="@(isActive && Outcome is null ? "state-active" : "")" />
+                    @if (s.IsFinal || (Machine.Kind == MachineKind.Turing && s.IsHalting))
+                    {
+                        <circle cx="@F(s.X)" cy="@F(s.Y)" r="@F(Radius - 5)" fill="none"
+                                stroke="@(isActive ? "var(--pa-surface)" : "currentColor")" stroke-width="1.4"
+                                stroke-dasharray="@(Machine.Kind == MachineKind.Turing && !s.IsFinal ? "3 2" : null)" />
+                    }
+                    <text x="@F(s.X)" y="@F(s.Y + 4.5)" text-anchor="middle"
+                          class="font-mono text-[13px] font-medium" fill="@(isActive ? "var(--pa-surface)" : "currentColor")">@s.Name</text>
+                </g>
+            }
+        </svg>
+        </div>
+
+        @if (!ReadOnly && (selectedState is not null || selectedEdge is not null))
+        {
+            <div class="absolute right-3 top-3 w-[min(19rem,calc(100%-1.5rem))]">
+                <DiagramInspector Machine="Machine" StateName="@selectedState" Edge="selectedEdge"
+                                  OnChanged="NotifyChangedAsync" OnClose="ClearSelection" OnRenamed="name => selectedState = name" />
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public string? ActiveState { get; set; }
+    [Parameter] public string? ActiveRuleId { get; set; }
+    [Parameter] public Verdict? Outcome { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private enum DiagramTool { Select, State, Transition }
+
+    private readonly string id = $"sd{Guid.NewGuid():N}"[..10];
+    private ElementReference svg;
+    private DiagramTool tool = DiagramTool.Select;
+    private string? selectedState;
+    private (string From, string To)? selectedEdge;
+    private string? dragging;
+    private (double X, double Y) dragOffset;
+    private string? pendingFrom;
+    private (double X, double Y) pointer;
+    private bool moved;
+
+    private string OutcomeFill => Outcome switch
+    {
+        Verdict.Accepted => "var(--color-pass)",
+        Verdict.Rejected or Verdict.DidNotHalt => "var(--color-fail)",
+        _ => "var(--pa-ink)"
+    };
+
+    private string OutcomeStroke => Outcome switch
+    {
+        Verdict.Accepted => "var(--color-pass)",
+        Verdict.Rejected or Verdict.DidNotHalt => "var(--color-fail)",
+        _ => "var(--pa-ink)"
+    };
+
+    private string Hint => tool switch
+    {
+        DiagramTool.State => "Click empty space to add a state. Double-click a state to toggle final.",
+        DiagramTool.Transition => "Drag from one state to another (or onto itself) to add a transition.",
+        _ => "Drag states to move them. Click a state or arrow to edit it."
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (selectedState is not null && Machine.FindState(selectedState) is null) selectedState = null;
+        if (selectedEdge is { } e && !Machine.Transitions.Any(t => t.From == e.From && t.To == e.To)) selectedEdge = null;
+    }
+
+    private RenderFragment ToolButton(DiagramTool value, string icon, string title) => __builder =>
+    {
+        <button type="button" title="@title" aria-label="@title" aria-pressed="@(tool == value)"
+                class="@($"grid size-8 place-items-center rounded-md transition {(tool == value ? "bg-ink text-surface" : "hover:bg-soft")}")"
+                @onclick="() => SetTool(value)">
+            <Icon Name="@icon" />
+        </button>
+    };
+
+    private void SetTool(DiagramTool value)
+    {
+        tool = value;
+        pendingFrom = null;
+    }
+
+    private (double X, double Y) ToSvg(PointerEventArgs e)
+    {
+        var point = ((IJSInProcessRuntime)JS).Invoke<SvgPoint>("profAlan.svgPoint", svg, e.ClientX, e.ClientY);
+        return (point.X, point.Y);
+    }
+
+    private async Task OnBackgroundClick(MouseEventArgs e)
+    {
+        if (ReadOnly) return;
+        if (tool == DiagramTool.State)
+        {
+            var point = ((IJSInProcessRuntime)JS).Invoke<SvgPoint>("profAlan.svgPoint", svg, e.ClientX, e.ClientY);
+            var (x, y) = Clamp(point.X, point.Y);
+            var state = Machine.AddState(x, y);
+            selectedState = state.Name;
+            selectedEdge = null;
+            await NotifyChangedAsync();
+            return;
+        }
+        ClearSelection();
+    }
+
+    private void OnStatePointerDown(PointerEventArgs e, StateNode s)
+    {
+        if (ReadOnly || e.Button != 0) return;
+        var p = ToSvg(e);
+        pointer = p;
+
+        if (tool == DiagramTool.Transition)
+        {
+            pendingFrom = s.Name;
+            return;
+        }
+
+        dragging = s.Name;
+        moved = false;
+        dragOffset = (s.X - p.X, s.Y - p.Y);
+        selectedState = s.Name;
+        selectedEdge = null;
+    }
+
+    private void OnPointerMove(PointerEventArgs e)
+    {
+        if (ReadOnly || (dragging is null && pendingFrom is null)) return;
+        pointer = ToSvg(e);
+
+        if (dragging is not null && Machine.FindState(dragging) is { } s)
+        {
+            (s.X, s.Y) = Clamp(pointer.X + dragOffset.X, pointer.Y + dragOffset.Y);
+            moved = true;
+        }
+    }
+
+    private async Task OnStatePointerUp(StateNode s)
+    {
+        if (ReadOnly) return;
+        if (pendingFrom is not null)
+        {
+            var from = pendingFrom;
+            pendingFrom = null;
+            await AddTransitionAsync(from, s.Name);
+            return;
+        }
+        await EndDragAsync();
+    }
+
+    private async Task OnCanvasPointerUp()
+    {
+        pendingFrom = null;
+        await EndDragAsync();
+    }
+
+    private async Task EndDragAsync()
+    {
+        var wasMoving = dragging is not null && moved;
+        dragging = null;
+        moved = false;
+        if (wasMoving) await NotifyChangedAsync();
+    }
+
+    private async Task AddTransitionAsync(string from, string to)
+    {
+        var sigma = Machine.Alphabet.Select(c => c.ToString()).ToList();
+        var rule = new TransitionRule { From = from, To = to };
+
+        switch (Machine.Kind)
+        {
+            case MachineKind.Dfa:
+                var free = sigma.FirstOrDefault(a => !Machine.Transitions.Any(t => t.From == from && t.Read == a));
+                if (free is null)
+                {
+                    selectedEdge = (from, to);
+                    selectedState = null;
+                    return;
+                }
+                rule.Read = free;
+                break;
+            case MachineKind.Turing:
+                var read = Machine.TapeAlphabet().Select(c => c.ToString())
+                    .FirstOrDefault(a => a != Symbols.LeftEnd.ToString() && !Machine.Transitions.Any(t => t.From == from && t.Read == a));
+                rule.Read = read ?? Symbols.Blank.ToString();
+                rule.Action = Symbols.MoveRight;
+                break;
+            default:
+                rule.Read = sigma.FirstOrDefault() ?? "";
+                break;
+        }
+
+        Machine.Transitions.Add(rule);
+        selectedEdge = (from, to);
+        selectedState = null;
+        await NotifyChangedAsync();
+    }
+
+    private void SelectEdge(EdgeShape edge)
+    {
+        if (ReadOnly) return;
+        selectedEdge = (edge.From, edge.To);
+        selectedState = null;
+    }
+
+    private async Task ToggleFinal(StateNode s)
+    {
+        if (ReadOnly) return;
+        if (Machine.Kind == MachineKind.Turing) s.IsHalting = !s.IsHalting;
+        else s.IsFinal = !s.IsFinal;
+        await NotifyChangedAsync();
+    }
+
+    private async Task Arrange()
+    {
+        Machine.ArrangeLeftToRight(Width, Height);
+        await NotifyChangedAsync();
+    }
+
+    private async Task DeleteSelection()
+    {
+        if (selectedState is not null && Machine.FindState(selectedState) is { } s)
+        {
+            Machine.RemoveState(s);
+        }
+        else if (selectedEdge is { } e)
+        {
+            Machine.Transitions.RemoveAll(t => t.From == e.From && t.To == e.To);
+        }
+        ClearSelection();
+        await NotifyChangedAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (ReadOnly) return;
+        switch (e.Key)
+        {
+            case "Delete" or "Backspace":
+                await DeleteSelection();
+                break;
+            case "Escape":
+                ClearSelection();
+                pendingFrom = null;
+                break;
+            case "v" or "V":
+                SetTool(DiagramTool.Select);
+                break;
+            case "s" or "S":
+                SetTool(DiagramTool.State);
+                break;
+            case "t" or "T":
+                SetTool(DiagramTool.Transition);
+                break;
+        }
+    }
+
+    private void ClearSelection()
+    {
+        selectedState = null;
+        selectedEdge = null;
+    }
+
+    private Task NotifyChangedAsync() => OnChanged.InvokeAsync();
+
+    private sealed record SvgPoint(double X, double Y);
+}
