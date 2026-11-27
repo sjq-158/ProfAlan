@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using ProfAlan;
 using ProfAlan.Features.Auth.Services;
 using ProfAlan.Features.Automata.Services;
+using ProfAlan.Features.Quizzes.Services;
 using ProfAlan.Shared.Services;
 using ProfAlan.Shared.Supabase;
 
@@ -26,17 +27,20 @@ builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<AuthSession>());
 builder.Services.AddScoped<IAccessTokenSource>(sp => sp.GetRequiredService<AuthSession>());
 builder.Services.AddScoped<SandboxDrafts>();
+builder.Services.AddScoped<PendingQuizDraft>();
 
 if (supabase.IsConfigured)
 {
     builder.Services.AddScoped<SupabaseRest>();
     builder.Services.AddScoped<IAuthGateway, SupabaseAuthGateway>();
     builder.Services.AddScoped<IAutomatonLibrary, SupabaseAutomatonLibrary>();
+    builder.Services.AddScoped<IQuizRepository, SupabaseQuizRepository>();
 }
 else
 {
     builder.Services.AddScoped<IAuthGateway, DemoAuthGateway>();
     builder.Services.AddScoped<IAutomatonLibrary, DemoAutomatonLibrary>();
+    builder.Services.AddScoped<IQuizRepository, DemoQuizRepository>();
 }
 
 await builder.Build().RunAsync();

@@ -1,0 +1,137 @@
+<section class="card">
+    <div class="card-header">
+        <div>
+            <p class="eyebrow">Test cases</p>
+            <p class="mt-0.5 text-xs text-muted">@Cases.Count(c => !c.IsHidden) visible · @Cases.Count(c => c.IsHidden) hidden. Solvers never see hidden strings, only whether they passed.</p>
+        </div>
+        <button type="button" class="btn px-2.5 py-1.5" @onclick="AddCase"><Icon Name="plus" /> Case</button>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[34rem] text-left text-sm">
+            <thead class="bg-soft text-xs text-muted">
+                <tr>
+                    <th class="w-10 px-3 py-2 font-medium">#</th>
+                    <th class="px-3 py-2 font-medium">Input w</th>
+                    <th class="px-3 py-2 font-medium">Expected</th>
+                    <th class="px-3 py-2 font-medium">Visibility</th>
+                    <th class="w-10"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var i = 0; i < Cases.Count; i++)
+                {
+                    var c = Cases[i];
+                    var stray = c.Input.Where(ch => !Alphabet.Contains(ch)).Distinct().ToList();
+                    var duplicate = Cases.Take(i).Any(o => o.Input == c.Input);
+                    <tr class="border-t border-line align-top">
+                        <td class="px-3 py-2 font-mono text-xs text-muted">@(i + 1)</td>
+                        <td class="px-3 py-1.5">
+                            <input class="@($"field field-mono py-1 {(stray.Count > 0 || duplicate ? "border-fail/60" : "")}")" value="@Symbols.Show(c.Input)" placeholder="e"
+                                   aria-label="@($"Input for case {i + 1}")" @onchange="e => SetInputAsync(c, e.Value?.ToString())" />
+                            @if (stray.Count > 0)
+                            {
+                                <p class="mt-1 text-xs text-fail">@string.Join(", ", stray) not in Σ</p>
+                            }
+                            else if (duplicate)
+                            {
+                                <p class="mt-1 text-xs text-fail">Duplicate of an earlier case</p>
+                            }
+                        </td>
+                        <td class="px-3 py-1.5">
+                            <div class="inline-flex rounded-lg border border-line p-0.5 text-xs">
+                                <button type="button" class="@($"rounded-md px-2.5 py-1 {(c.ShouldAccept ? "bg-pass text-white" : "")}")" @onclick="() => SetAsync(() => c.ShouldAccept = true)">Accept</button>
+                                <button type="button" class="@($"rounded-md px-2.5 py-1 {(!c.ShouldAccept ? "bg-fail text-white" : "")}")" @onclick="() => SetAsync(() => c.ShouldAccept = false)">Reject</button>
+                            </div>
+                        </td>
+                        <td class="px-3 py-1.5">
+                            <button type="button" class="btn px-2.5 py-1 text-xs" @onclick="() => SetAsync(() => c.IsHidden = !c.IsHidden)">
+                                <Icon Name="@(c.IsHidden ? "eye-off" : "eye")" Class="size-3.5" /> @(c.IsHidden ? "Hidden" : "Visible")
+                            </button>
+                        </td>
+                        <td class="pr-2 pt-2 text-right">
+                            <button type="button" class="grid size-7 place-items-center rounded-md text-fail hover:bg-fail/10" aria-label="@($"Delete case {i + 1}")" @onclick="() => SetAsync(() => Cases.Remove(c))">
+                                <Icon Name="trash" Class="size-3.5" />
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Cases.Count == 0)
+        {
+            <p class="px-4 py-6 text-center text-sm text-muted">No test cases yet. Add them one by one or generate them below.</p>
+        }
+    </div>
+
+    <div class="grid gap-4 border-t border-line p-4 md:grid-cols-2">
+        <div>
+            <p class="label">Generate strings</p>
+            <div class="flex gap-2">
+                <select class="field w-auto" @bind="maxLength" aria-label="Maximum length">
+                    @for (var n = 1; n <= 6; n++)
+                    {
+                        <option value="@n">all up to length @n</option>
+                    }
+                </select>
+                <button type="button" class="btn flex-1" disabled="@(Alphabet.Length == 0)" @onclick="GenerateAsync"><Icon Name="plus" /> Add</button>
+            </div>
+            <p class="mt-1.5 text-xs text-muted">New strings over Σ are added as hidden cases, except the first four.</p>
+        </div>
+        <div>
+            <p class="label">Label from a reference answer</p>
+            <div class="flex gap-2">
+                <input class="field field-mono" @bind="reference" placeholder="a(a ∪ b)*bb  or  S → aSb | e" aria-label="Reference regex or grammar" />
+                <button type="button" class="btn shrink-0" disabled="@string.IsNullOrWhiteSpace(reference)" @onclick="LabelAsync"><Icon Name="wand" /> Label</button>
+            </div>
+            @if (referenceError is not null)
+            {
+                <p class="mt-1.5 text-xs text-fail">@referenceError</p>
+            }
+            else
+            {
+                <p class="mt-1.5 text-xs text-muted">Sets Accept/Reject on every case using a trusted regex or grammar. It is not saved.</p>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public List<TestCase> Cases { get; set; } = [];
+    [Parameter] public string Alphabet { get; set; } = "";
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private int maxLength = 3;
+    private string reference = "";
+    private string? referenceError;
+
+    private async Task SetAsync(Action change)
+    {
+        change();
+        await OnChanged.InvokeAsync();
+    }
+
+    private Task SetInputAsync(TestCase c, string? value) =>
+        SetAsync(() => c.Input = Symbols.IsEmpty(value) ? "" : value!.Trim());
+
+    private Task AddCase() => SetAsync(() => Cases.Add(new TestCase { Input = "", IsHidden = Cases.Count >= 4 }));
+
+    private Task GenerateAsync() => SetAsync(() =>
+    {
+        foreach (var w in QuizGrader.AllStrings(Alphabet, maxLength))
+        {
+            if (Cases.Any(c => c.Input == w)) continue;
+            Cases.Add(new TestCase { Input = w, ShouldAccept = false, IsHidden = Cases.Count >= 4 });
+        }
+    });
+
+    private async Task LabelAsync()
+    {
+        var oracle = QuizGrader.ReferenceOracle(reference, out referenceError);
+        if (oracle is null) return;
+        await SetAsync(() =>
+        {
+            foreach (var c in Cases) c.ShouldAccept = oracle(c.Input);
+        });
+    }
+}

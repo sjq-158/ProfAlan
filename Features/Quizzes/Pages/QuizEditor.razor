@@ -1,0 +1,196 @@
+@page "/quizzes/create"
+@page "/quizzes/{Id:guid}/edit"
+@attribute [Authorize]
+@inject IQuizRepository Quizzes
+@inject AuthSession Auth
+@inject Notifier Notifier
+@inject NavigationManager Navigation
+@inject PendingQuizDraft Pending
+
+<PageTitle>@(Id is null ? "Create problem" : "Edit problem") · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+    <PageHeader BackHref="quizzes" BackLabel="All problems" Eyebrow="Problem creator"
+                Title="@(Id is null ? "Create a problem" : "Edit problem")"
+                Subtitle="Describe a formal language, choose what solvers must build, and give the test cases that define correct behaviour." />
+
+    @if (loading)
+    {
+        <div class="grid min-h-[30vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+    }
+    else if (forbidden)
+    {
+        <EmptyState IconName="lock" Title="Only the author can edit this problem" Message="You can still solve it from the Quiz Arena.">
+            <a href="quizzes" class="btn">Back to problems</a>
+        </EmptyState>
+    }
+    else
+    {
+        <div class="space-y-6">
+            @if (fromGenerator)
+            {
+                <p class="flex items-start gap-2 rounded-lg border border-line bg-soft px-4 py-3 text-sm">
+                    <Icon Name="wand" Class="mt-0.5 size-4" />
+                    Drafted by the AI assistant in the Study Area. Review the prompt and every expected verdict before publishing.
+                </p>
+            }
+
+            <section class="card space-y-4 p-5">
+                <div>
+                    <label class="label" for="quiz-title">Title</label>
+                    <input id="quiz-title" class="field" @bind="quiz.Title" placeholder="Strings that end with bb" />
+                </div>
+                <div>
+                    <label class="label" for="quiz-prompt">Language description</label>
+                    <textarea id="quiz-prompt" rows="4" class="field" @bind="quiz.Prompt"
+                              placeholder="Construct a DFA for L = { w ∈ {a,b}* | w ends with bb }."></textarea>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="label" for="quiz-kind">Solvers submit a</label>
+                        <select id="quiz-kind" class="field" @bind="quiz.AnswerKind">
+                            @foreach (var kind in Enum.GetValues<AnswerKind>())
+                            {
+                                <option value="@kind">@kind.Label()</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label" for="quiz-sigma">Alphabet Σ</label>
+                        <input id="quiz-sigma" class="field field-mono" value="@string.Join(", ", quiz.Alphabet.ToCharArray())" placeholder="a, b"
+                               @onchange="e => quiz.Alphabet = new string((e.Value?.ToString() ?? string.Empty).Where(c => !char.IsWhiteSpace(c) && c != ',').Distinct().ToArray())" />
+                    </div>
+                    <div>
+                        <p class="label">Visibility</p>
+                        <label class="@($"flex h-[38px] items-center gap-2.5 rounded-lg border border-line px-3 text-sm {(CanPublish ? "" : "opacity-60")}")">
+                            <input type="checkbox" class="size-4 accent-[var(--pa-ink)]" @bind="quiz.IsPublished" disabled="@(!CanPublish)" />
+                            Published to everyone
+                        </label>
+                        @if (!CanPublish)
+                        {
+                            <p class="mt-1 text-xs text-muted">Students create private practice problems; instructors publish.</p>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <TestCaseEditor Cases="cases" Alphabet="@quiz.Alphabet" OnChanged="StateHasChanged" />
+
+            @if (problems.Count > 0)
+            {
+                <ul class="space-y-1.5 rounded-lg border border-fail/30 bg-fail/5 px-4 py-3 text-sm text-fail">
+                    @foreach (var problem in problems)
+                    {
+                        <li class="flex items-start gap-2"><Icon Name="alert" Class="mt-0.5 size-4" /> @problem</li>
+                    }
+                </ul>
+            }
+
+            <div class="flex flex-wrap justify-end gap-2">
+                <a href="quizzes" class="btn">Cancel</a>
+                <button type="button" class="btn btn-primary" disabled="@saving" @onclick="SaveAsync">
+                    @if (saving)
+                    {
+                        <Spinner />
+                    }
+                    else
+                    {
+                        <Icon Name="save" />
+                    }
+                    @(Id is null ? "Create problem" : "Save changes")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private Quiz quiz = new();
+    private List<TestCase> cases = [];
+    private List<string> problems = [];
+    private bool loading = true;
+    private bool forbidden;
+    private bool saving;
+    private bool fromGenerator;
+
+    private bool CanPublish => Auth.Current?.Role == UserRole.Instructor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        if (Id is { } id)
+        {
+            var existing = await Quizzes.GetAsync(id);
+            if (existing is null || existing.AuthorId != Auth.Current?.UserId)
+            {
+                forbidden = true;
+            }
+            else
+            {
+                quiz = existing;
+                cases = (await Quizzes.GetCasesAsync(id, includeHidden: true)).ToList();
+            }
+        }
+        else if (Pending.Take() is { } draft)
+        {
+            quiz = draft.Quiz;
+            cases = draft.Cases;
+            fromGenerator = true;
+        }
+        else
+        {
+            cases =
+            [
+                new TestCase { Input = "", ShouldAccept = false },
+                new TestCase { Input = "a", ShouldAccept = false }
+            ];
+        }
+        loading = false;
+    }
+
+    private List<string> Validate()
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(quiz.Title)) list.Add("Give the problem a title.");
+        if (string.IsNullOrWhiteSpace(quiz.Prompt)) list.Add("Describe the language solvers must recognise.");
+        if (quiz.Alphabet.Length == 0) list.Add("Declare the alphabet Σ.");
+        if (quiz.Alphabet.Any(Symbols.IsReserved)) list.Add("Σ cannot contain e, ε, ⊔ or ▷.");
+        if (cases.Count < 2) list.Add("Add at least two test cases.");
+        if (!cases.Any(c => !c.IsHidden)) list.Add("Keep at least one test case visible so solvers have an example.");
+        if (cases.Any(c => c.Input.Any(ch => !quiz.Alphabet.Contains(ch)))) list.Add("Every test input must be a string over Σ.");
+        if (cases.GroupBy(c => c.Input).Any(g => g.Count() > 1)) list.Add("Remove duplicate test inputs.");
+        if (cases.All(c => c.ShouldAccept) || cases.All(c => !c.ShouldAccept))
+        {
+            list.Add("Include both strings that should be accepted and strings that should be rejected.");
+        }
+        return list;
+    }
+
+    private async Task SaveAsync()
+    {
+        problems = Validate();
+        if (problems.Count > 0) return;
+
+        saving = true;
+        try
+        {
+            quiz.AuthorId ??= Auth.Current?.UserId;
+            if (string.IsNullOrEmpty(quiz.AuthorName)) quiz.AuthorName = Auth.Current?.DisplayName ?? "";
+            if (!CanPublish) quiz.IsPublished = false;
+
+            var saved = await Quizzes.SaveAsync(quiz, cases);
+            Notifier.Success(Id is null ? $"Created \"{saved.Title}\"." : "Changes saved.");
+            Navigation.NavigateTo($"quizzes/{saved.Id}/solve");
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Could not save: {ex.Message}");
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

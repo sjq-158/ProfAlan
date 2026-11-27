@@ -1,0 +1,318 @@
+@page "/quizzes/{Id:guid}/solve"
+@attribute [Authorize]
+@using ProfAlan.Domain.Grammars
+@using ProfAlan.Domain.Regular
+@inject IQuizRepository Quizzes
+@inject AuthSession Auth
+@inject BrowserStorage Storage
+@inject Notifier Notifier
+
+<PageTitle>@(quiz?.Title ?? "Problem") · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-[96rem] px-4 py-6 sm:px-6">
+    <a href="quizzes" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink">
+        <Icon Name="arrow-left" /> All problems
+    </a>
+
+    @if (loading)
+    {
+        <div class="grid min-h-[40vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+    }
+    else if (quiz is null)
+    {
+        <EmptyState IconName="alert" Title="Problem not found" Message="It may have been deleted or made private by its author.">
+            <a href="quizzes" class="btn">Back to problems</a>
+        </EmptyState>
+    }
+    else
+    {
+        <div class="grid gap-5 xl:grid-cols-[26rem_minmax(0,1fr)]">
+            <aside class="min-w-0 space-y-5">
+                <section class="card p-5">
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                        <span class="chip">@quiz.AnswerKind.Label()</span>
+                        <span class="chip">Σ = {@string.Join(", ", quiz.Alphabet.ToCharArray())}</span>
+                        @if (IsAuthor)
+                        {
+                            <a href="@($"quizzes/{quiz.Id}/edit")" class="btn ml-auto px-2.5 py-1 text-xs"><Icon Name="pencil" Class="size-3.5" /> Edit</a>
+                        }
+                    </div>
+                    <h1 class="font-display text-2xl leading-snug">@quiz.Title</h1>
+                    <p class="mt-3 whitespace-pre-line leading-relaxed">@quiz.Prompt</p>
+                    <p class="mt-4 text-xs text-muted">By @(IsAuthor ? "you" : quiz.AuthorName) · @quiz.VisibleCount visible and @quiz.HiddenCount hidden test cases</p>
+                </section>
+
+                <section class="card">
+                    <div class="card-header"><p class="eyebrow">Sample test cases</p></div>
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-soft text-xs text-muted">
+                            <tr><th class="px-4 py-2 font-medium">Input</th><th class="px-4 py-2 font-medium">Expected</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var c in visibleCases)
+                            {
+                                <tr class="border-t border-line">
+                                    <td class="px-4 py-2 font-mono">@Symbols.Show(c.Input)</td>
+                                    <td class="px-4 py-2">
+                                        <span class="@(c.ShouldAccept ? "text-pass" : "text-fail") font-medium">@(c.ShouldAccept ? "Accept" : "Reject")</span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (quiz.HiddenCount > 0)
+                    {
+                        <p class="flex items-center gap-2 border-t border-line px-4 py-2.5 text-xs text-muted">
+                            <Icon Name="lock" Class="size-3.5" /> @quiz.HiddenCount more hidden @(quiz.HiddenCount == 1 ? "case is" : "cases are") checked on submit.
+                        </p>
+                    }
+                </section>
+
+                @if (report is not null)
+                {
+                    <GradeResults Report="report" IsSubmission="reportIsSubmission" />
+                }
+
+                <section class="card">
+                    <div class="card-header">
+                        <p class="eyebrow">@(IsAuthor ? "All submissions" : "Your attempts")</p>
+                        <span class="badge-muted">@submissions.Count</span>
+                    </div>
+                    @if (submissions.Count == 0)
+                    {
+                        <p class="px-4 py-4 text-sm text-muted">@(IsAuthor ? "Nobody has submitted yet." : "Submit your answer to record an attempt.")</p>
+                    }
+                    else
+                    {
+                        <ul class="max-h-72 divide-y divide-line overflow-y-auto">
+                            @foreach (var s in submissions)
+                            {
+                                <li class="flex items-center gap-3 px-4 py-2.5 text-sm">
+                                    <span class="@(s.IsPerfect ? "badge-pass" : "badge-fail")">@s.Passed/@s.Total</span>
+                                    @if (IsAuthor)
+                                    {
+                                        <span class="truncate">@s.StudentName</span>
+                                    }
+                                    <span class="ml-auto shrink-0 text-xs text-muted">@s.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </section>
+            </aside>
+
+            <div class="min-w-0 space-y-5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div>
+                        <p class="eyebrow">Your answer</p>
+                        <p class="font-display text-xl">@AnswerHeading</p>
+                    </div>
+                    <div class="ml-auto flex flex-wrap gap-2">
+                        <button type="button" class="btn" disabled="@grading" @onclick="() => GradeAsync(submit: false)"><Icon Name="play" /> Run sample tests</button>
+                        <button type="button" class="btn btn-primary" disabled="@grading" @onclick="() => GradeAsync(submit: true)">
+                            @if (grading)
+                            {
+                                <Spinner />
+                            }
+                            else
+                            {
+                                <Icon Name="send" />
+                            }
+                            Submit
+                        </button>
+                    </div>
+                </div>
+
+                @if (answerMachine is not null)
+                {
+                    <MachineWorkbench Machine="answerMachine" ActiveState="@active?.State" ActiveRuleId="@active?.RuleId" Outcome="outcome" OnChanged="OnAnswerChangedAsync" />
+                    <div class="grid gap-5 lg:grid-cols-2">
+                        <div class="space-y-5">
+                            <FormalDefinition Machine="answerMachine" OnChanged="OnAnswerChangedAsync" />
+                            <DefinitionIssues Machine="answerMachine" OnChanged="OnAnswerChangedAsync" />
+                        </div>
+                        <ExecutionPanel Machine="answerMachine" Revision="revision" OnConfigurationChanged="c => active = c" OnOutcomeChanged="v => outcome = v" />
+                    </div>
+                }
+                else
+                {
+                    <section class="card">
+                        <div class="card-header">
+                            <p class="eyebrow">@(quiz.AnswerKind == AnswerKind.Regex ? "Regular expression R" : "Grammar rules R")</p>
+                            @if (TextAnswerError is null)
+                            {
+                                <span class="badge-pass"><Icon Name="check" Class="size-3" /> Well formed</span>
+                            }
+                            else
+                            {
+                                <span class="badge-fail">Not well formed</span>
+                            }
+                        </div>
+                        <div class="space-y-3 p-4">
+                            @if (quiz.AnswerKind == AnswerKind.Regex)
+                            {
+                                <input class="field field-mono text-base" value="@textAnswer" @oninput="e => SetTextAnswerAsync(e.Value?.ToString())" placeholder="(a ∪ b)*bb" spellcheck="false" aria-label="Regular expression" />
+                                <p class="text-xs text-muted">Union: ∪, + or |. Star: *. Empty string: e. Empty set: ∅.</p>
+                            }
+                            else
+                            {
+                                <textarea rows="8" class="field field-mono text-[14px] leading-relaxed" value="@textAnswer" @oninput="e => SetTextAnswerAsync(e.Value?.ToString())"
+                                          placeholder="S → aSb | e" spellcheck="false" aria-label="Grammar rules"></textarea>
+                                <p class="text-xs text-muted">Variables are A–Z; the first left-hand side is the start symbol. Separate alternatives with |.</p>
+                            }
+                            @if (TextAnswerError is { } err && textAnswer.Length > 0)
+                            {
+                                <p class="text-sm text-fail">@err</p>
+                            }
+                        </div>
+                    </section>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Quiz? quiz;
+    private IReadOnlyList<TestCase> visibleCases = [];
+    private List<Submission> submissions = [];
+    private Automaton? answerMachine;
+    private string textAnswer = "";
+    private GradeReport? report;
+    private bool reportIsSubmission;
+    private bool loading = true;
+    private bool grading;
+    private int revision;
+    private Configuration? active;
+    private Verdict? outcome;
+
+    private string DraftKey => $"profalan.answer.{Auth.Current?.UserId}.{Id}";
+    private bool IsAuthor => quiz?.AuthorId is not null && quiz.AuthorId == Auth.Current?.UserId;
+
+    private string AnswerHeading => quiz?.AnswerKind switch
+    {
+        AnswerKind.Regex => "Write a regular expression",
+        AnswerKind.Grammar => "Write a context-free grammar",
+        { } kind => $"Build a {kind.Label()}",
+        _ => ""
+    };
+
+    private string? TextAnswerError
+    {
+        get
+        {
+            if (quiz?.AnswerKind == AnswerKind.Regex)
+            {
+                return RegexParser.TryParse(textAnswer, out _, out var error) ? null : error;
+            }
+            try
+            {
+                ContextFreeGrammar.Parse(textAnswer);
+                return null;
+            }
+            catch (GrammarSyntaxException ex)
+            {
+                return ex.Message;
+            }
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        try
+        {
+            quiz = await Quizzes.GetAsync(Id);
+            if (quiz is null) return;
+
+            visibleCases = await Quizzes.GetCasesAsync(Id, includeHidden: false);
+            submissions = (await Quizzes.SubmissionsAsync(Id)).ToList();
+
+            var draft = await Storage.GetAsync(DraftKey);
+            if (quiz.AnswerKind.Machine() is { } kind)
+            {
+                answerMachine = TryReadMachine(draft, kind) ?? NewMachine(kind);
+            }
+            else
+            {
+                textAnswer = draft ?? "";
+            }
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Could not load the problem: {ex.Message}");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private Automaton NewMachine(MachineKind kind)
+    {
+        var machine = Automaton.Blank(kind);
+        machine.Name = $"Answer to {quiz!.Title}";
+        machine.Alphabet = quiz.Alphabet.ToList();
+        if (kind == MachineKind.Pda) machine.StackAlphabet = quiz.Alphabet.ToList();
+        return machine;
+    }
+
+    private static Automaton? TryReadMachine(string? json, MachineKind kind)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        try
+        {
+            var machine = Automaton.FromJson(json);
+            return machine.Kind == kind ? machine : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    private string CurrentAnswer => answerMachine?.ToJson() ?? textAnswer;
+
+    private async Task OnAnswerChangedAsync()
+    {
+        revision++;
+        await Storage.SetAsync(DraftKey, CurrentAnswer);
+    }
+
+    private async Task SetTextAnswerAsync(string? value)
+    {
+        textAnswer = value ?? "";
+        await Storage.SetAsync(DraftKey, textAnswer);
+    }
+
+    private async Task GradeAsync(bool submit)
+    {
+        if (quiz is null || Auth.Current is not { } me) return;
+        grading = true;
+        try
+        {
+            var cases = submit ? await Quizzes.GetGradingCasesAsync(Id) : visibleCases;
+            report = QuizGrader.EvaluateTestCases(quiz, CurrentAnswer, cases);
+            reportIsSubmission = submit;
+
+            if (submit)
+            {
+                var submission = new Submission(Guid.NewGuid(), Id, me.UserId, me.DisplayName, CurrentAnswer, report.Passed, report.Total, DateTimeOffset.UtcNow);
+                await Quizzes.RecordSubmissionAsync(submission);
+                submissions.Insert(0, submission);
+                if (report.IsPerfect) Notifier.Success("All test cases passed.");
+                else Notifier.Info($"{report.Passed} of {report.Total} test cases passed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Grading failed: {ex.Message}");
+        }
+        finally
+        {
+            grading = false;
+        }
+    }
+}

@@ -1,0 +1,149 @@
+@page "/quizzes"
+@attribute [Authorize]
+@inject IQuizRepository Quizzes
+@inject AuthSession Auth
+@inject Notifier Notifier
+
+<PageTitle>Quiz Arena · ProfAlan</PageTitle>
+
+<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <PageHeader Eyebrow="Quiz Arena" Title="Problems"
+                Subtitle="Each problem describes a language. Build the machine, expression or grammar, then submit it against visible and hidden test cases.">
+        <Actions>
+            <a href="quizzes/create" class="btn btn-primary"><Icon Name="plus" /> Create problem</a>
+        </Actions>
+    </PageHeader>
+
+    <div class="mb-6 flex flex-wrap items-center gap-3">
+        <div class="flex gap-1 rounded-lg border border-line bg-soft p-1" role="tablist">
+            <button type="button" role="tab" class="@($"tab {(tab == "all" ? "tab-active" : "")}")" @onclick='() => tab = "all"'>All problems</button>
+            <button type="button" role="tab" class="@($"tab {(tab == "mine" ? "tab-active" : "")}")" @onclick='() => tab = "mine"'>Created by me</button>
+        </div>
+        <select class="field w-auto" @bind="kindFilter" aria-label="Filter by answer type">
+            <option value="">Any answer type</option>
+            @foreach (var kind in Enum.GetValues<AnswerKind>())
+            {
+                <option value="@kind">@kind.Label()</option>
+            }
+        </select>
+        <div class="relative ml-auto w-full sm:w-72">
+            <input class="field" placeholder="Search problems" @bind="search" @bind:event="oninput" aria-label="Search problems" />
+        </div>
+    </div>
+
+    @if (quizzes is null)
+    {
+        <div class="grid min-h-[30vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+    }
+    else if (!Visible.Any())
+    {
+        <EmptyState IconName="checks" Title="@(tab == "mine" ? "You have not created any problems yet" : "No problems match")"
+                    Message="@(tab == "mine" ? "Describe a language and add test cases; solvers will be graded automatically." : "Try a different filter or search term.")">
+            @if (tab == "mine")
+            {
+                <a href="quizzes/create" class="btn btn-primary"><Icon Name="plus" /> Create a problem</a>
+            }
+        </EmptyState>
+    }
+    else
+    {
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            @foreach (var quiz in Visible)
+            {
+                var mine = quiz.AuthorId is not null && quiz.AuthorId == Auth.Current?.UserId;
+                var best = BestScore(quiz.Id);
+                <article class="card flex flex-col p-5 transition hover:shadow-md">
+                    <div class="mb-3 flex flex-wrap items-center gap-2">
+                        <span class="chip">@quiz.AnswerKind.Label()</span>
+                        <span class="chip">Σ = {@string.Join(", ", quiz.Alphabet.ToCharArray())}</span>
+                        @if (!quiz.IsPublished)
+                        {
+                            <span class="badge-muted"><Icon Name="lock" Class="size-3" /> Private</span>
+                        }
+                        @if (best is { } b)
+                        {
+                            <span class="@(b.IsPerfect ? "badge-pass" : "badge-muted") ml-auto">Best @b.Passed/@b.Total</span>
+                        }
+                    </div>
+                    <h2 class="font-display text-xl leading-snug">@quiz.Title</h2>
+                    <p class="mt-2 line-clamp-3 flex-1 text-sm text-muted">@quiz.Prompt</p>
+                    <div class="mt-4 flex items-center gap-3 text-xs text-muted">
+                        <span class="flex items-center gap-1"><Icon Name="eye" Class="size-3.5" /> @quiz.VisibleCount visible</span>
+                        <span class="flex items-center gap-1"><Icon Name="eye-off" Class="size-3.5" /> @quiz.HiddenCount hidden</span>
+                        <span class="ml-auto truncate">by @(mine ? "you" : quiz.AuthorName)</span>
+                    </div>
+                    <div class="mt-4 flex gap-2 border-t border-line pt-4">
+                        <a href="@($"quizzes/{quiz.Id}/solve")" class="btn btn-primary flex-1"><Icon Name="play" /> @(best is null ? "Solve" : "Try again")</a>
+                        @if (mine)
+                        {
+                            <a href="@($"quizzes/{quiz.Id}/edit")" class="btn-icon" title="Edit" aria-label="Edit problem"><Icon Name="pencil" /></a>
+                            <button type="button" class="btn-icon text-fail" title="Delete" aria-label="Delete problem" @onclick="() => confirmDelete = quiz"><Icon Name="trash" /></button>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@if (confirmDelete is not null)
+{
+    <div class="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4" @onclick="() => confirmDelete = null">
+        <div class="card w-full max-w-md p-6 shadow-xl" @onclick:stopPropagation="true" role="dialog" aria-modal="true">
+            <h2 class="font-display text-xl">Delete this problem?</h2>
+            <p class="mt-2 text-sm text-muted">"@confirmDelete.Title", its test cases and all submissions will be removed. This cannot be undone.</p>
+            <div class="mt-6 flex justify-end gap-2">
+                <button type="button" class="btn" @onclick="() => confirmDelete = null">Cancel</button>
+                <button type="button" class="btn btn-danger" @onclick="DeleteAsync"><Icon Name="trash" /> Delete</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<Quiz>? quizzes;
+    private IReadOnlyList<Submission> mySubmissions = [];
+    private string tab = "all";
+    private string kindFilter = "";
+    private string search = "";
+    private Quiz? confirmDelete;
+
+    private IEnumerable<Quiz> Visible => (quizzes ?? [])
+        .Where(q => tab == "all" || (q.AuthorId is not null && q.AuthorId == Auth.Current?.UserId))
+        .Where(q => kindFilter == "" || q.AnswerKind.ToString() == kindFilter)
+        .Where(q => search.Length == 0 || q.Title.Contains(search, StringComparison.OrdinalIgnoreCase) || q.Prompt.Contains(search, StringComparison.OrdinalIgnoreCase));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            quizzes = await Quizzes.ListAsync();
+            mySubmissions = await Quizzes.MySubmissionsAsync();
+        }
+        catch (Exception ex)
+        {
+            quizzes = [];
+            Notifier.Error($"Could not load problems: {ex.Message}");
+        }
+    }
+
+    private Submission? BestScore(Guid quizId) =>
+        mySubmissions.Where(s => s.QuizId == quizId).OrderByDescending(s => s.Passed * 1.0 / Math.Max(1, s.Total)).FirstOrDefault();
+
+    private async Task DeleteAsync()
+    {
+        if (confirmDelete is null) return;
+        var quiz = confirmDelete;
+        confirmDelete = null;
+        try
+        {
+            await Quizzes.DeleteAsync(quiz.Id);
+            quizzes = quizzes!.Where(q => q.Id != quiz.Id).ToList();
+            Notifier.Success($"Deleted \"{quiz.Title}\".");
+        }
+        catch (Exception ex)
+        {
+            Notifier.Error($"Could not delete: {ex.Message}");
+        }
+    }
+}
