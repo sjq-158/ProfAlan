@@ -27,6 +27,7 @@ Formal conventions in the engines:
 - **NFA** `Δ ⊆ K × Σ* × K`, so an arrow may read a whole string or e.
 - **PDA** `M = (K, Σ, Γ, Δ, s, F)`. Accepts iff `(s, w, e) ⊢* (p, e, e)` with `p ∈ F`, which means final state *and* empty stack.
 - **TM** `M = (K, Σ, δ, s, H)`. The tape starts as `▷⊔w` with the head on the blank, and δ must move → on ▷. When one halting state is marked accepting (y) the machine decides; otherwise halting means acceptance.
+- **Diagrams** use the notation from the midterm review: DFA/NFA states are small dots with the name underneath and a ring for final states, and a start arrow comes in from the left. PDA and TM states are labelled circles. The canvas is infinite: scroll to zoom at the cursor, drag empty space to pan, and use the zoom bar to fit the diagram. Shapes can be dragged in from the palette, and a selected state's `+` handle can be dragged to another state to add a transition.
 - **TM arrow labels** follow the class notation from the midterm review: `σ/b` writes b and `σ/→`, `σ/←` move. Every rule on an arrow is stacked as its own line.
 - **Regex** accepts `∪`, `+` or `|` for union, `e` for the empty string and `∅` for the empty language.
 - **CFG** variables are A–Z and the first left-hand side is the start symbol. Membership is decided with an Earley parser.

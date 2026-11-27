@@ -1,269 +1,67 @@
 @page "/"
-@using ProfAlan.Features.Home.Components
-@using ProfAlan.Features.StudyArea.Services
+@layout BareLayout
 
-<PageTitle>ProfAlan · Automata theory studio</PageTitle>
+<PageTitle>ProfAlan Studio</PageTitle>
 
-<section class="dot-grid relative border-b border-line">
-    <div class="mx-auto max-w-5xl px-4 pb-20 pt-20 text-center sm:px-6 sm:pt-28">
-        <span class="kicker fade-up"><Icon Name="book" Class="size-3.5" /> Built on Lewis &amp; Papadimitriou, 2nd edition</span>
-        <h1 class="fade-up mt-7 font-display text-5xl leading-[1.05] sm:text-7xl" style="animation-delay:.08s">
-            ProfAlan <span class="text-muted/60">Studio</span>
-        </h1>
-        <p class="fade-up mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-muted" style="animation-delay:.16s">
-            The learning, simulation and assessment platform for automata theory. Draw DFAs, PDAs and Turing machines,
-            trace every configuration, and get graded on hidden test cases.
-        </p>
-        <div class="fade-up mt-9 flex flex-wrap justify-center gap-3" style="animation-delay:.24s">
-            <a href="sandbox" class="btn-pill btn-pill-primary">Launch Studio <Icon Name="arrow-right" /></a>
-            <AuthorizeView>
-                <Authorized>
-                    <a href="dashboard" class="btn-pill bg-card/70">Go to dashboard</a>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="login" class="btn-pill bg-card/70">Sign in</a>
-                </NotAuthorized>
-            </AuthorizeView>
-        </div>
+<div class="dot-grid flex min-h-screen flex-col">
+    <header class="flex items-center justify-end gap-2 px-4 pt-5 sm:px-8">
+        <AuthorizeView>
+            <Authorized>
+                <a href="dashboard" class="btn-pill px-4 py-2">Dashboard</a>
+            </Authorized>
+            <NotAuthorized>
+                <a href="login" class="btn-pill px-4 py-2">Sign in</a>
+            </NotAuthorized>
+        </AuthorizeView>
+        <ThemePicker />
+    </header>
 
-        <div class="fade-up mx-auto mt-16 max-w-3xl text-left" style="animation-delay:.32s">
-            <MiniPreview />
-        </div>
-    </div>
-</section>
+    <main class="flex-1">
+        <section class="mx-auto flex max-w-4xl flex-col items-center px-4 pt-12 text-center sm:px-6 sm:pt-16">
+            <span class="fade-up grid size-20 place-items-center rounded-2xl bg-ink text-surface shadow-lg">
+                <BrandMark Class="size-11" />
+            </span>
+            <h1 class="fade-up mt-10 font-display text-6xl leading-none sm:text-8xl" style="animation-delay:.08s">
+                ProfAlan <span class="text-muted/70">Studio</span>
+            </h1>
+            <p class="fade-up mt-12 max-w-3xl text-lg leading-loose text-muted sm:text-xl" style="animation-delay:.16s">
+                Explore the theory of computation through interactive visualization. Build and simulate
+                Finite Automata, Pushdown Automata, Turing Machines, Context-Free Grammars and Regular Expressions in real time.
+            </p>
+            <a href="sandbox" class="fade-up btn-pill btn-pill-primary mt-12 px-10 py-5 text-lg" style="animation-delay:.24s">
+                Launch Application <Icon Name="arrow-right" Class="size-5" />
+            </a>
+        </section>
 
-<section class="border-b border-line">
-    <div class="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:grid-cols-3 sm:px-6">
-        @foreach (var (label, items) in Credits)
-        {
-            <div>
-                <p class="eyebrow mb-3">@label</p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach (var item in items)
-                    {
-                        <span class="rounded-full border border-line bg-card px-3 py-1 text-sm">@item</span>
-                    }
-                </div>
-            </div>
-        }
-    </div>
-</section>
-
-<section class="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-    <div class="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-        <div>
-            <p class="eyebrow mb-3">Total reach</p>
-            <h2 class="font-display text-4xl leading-tight">Every machine in the syllabus, in one studio</h2>
-            <dl class="mt-10 grid grid-cols-2 gap-4">
-                @foreach (var (value, label) in Stats)
-                {
-                    <div class="rounded-2xl border border-line bg-card p-5">
-                        <dt class="font-mono text-4xl font-semibold">@value</dt>
-                        <dd class="mt-1 text-sm text-muted">@label</dd>
-                    </div>
-                }
-            </dl>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-            @foreach (var (slug, name, formal, icon) in Checkers)
+        <section class="mx-auto mt-28 grid max-w-6xl gap-6 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3" aria-label="What you can do">
+            @foreach (var card in Cards)
             {
-                <a href="@($"sandbox?kind={slug}")" class="group flex items-center gap-4 rounded-2xl border border-line bg-card px-4 py-4 transition hover:-translate-y-0.5 hover:border-ink/40">
-                    <span class="grid size-11 shrink-0 place-items-center rounded-full border border-line transition group-hover:bg-ink group-hover:text-surface"><Icon Name="@icon" /></span>
-                    <span class="min-w-0">
-                        <span class="block font-semibold">@name</span>
-                        <span class="block truncate font-mono text-xs text-muted">@formal</span>
+                <a href="@card.Href" class="group rounded-3xl border border-line bg-card p-8 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                    <span class="grid size-12 place-items-center rounded-xl border border-line bg-surface/60 transition group-hover:bg-ink group-hover:text-surface">
+                        <Icon Name="@card.Icon" Class="size-5" />
                     </span>
+                    <h2 class="mt-8 text-xl font-semibold leading-snug">@card.Title</h2>
+                    <p class="mt-3 leading-relaxed text-muted">@card.Text</p>
                 </a>
             }
-        </div>
-    </div>
-</section>
+        </section>
+    </main>
 
-<section class="dot-grid border-y border-line">
-    <div class="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center">
-        <div>
-            <p class="eyebrow mb-3">What is ProfAlan?</p>
-            <h2 class="font-display text-4xl leading-tight">An interactive companion for the theory of computation.</h2>
-            <ul class="mt-8 space-y-4">
-                @foreach (var point in Points)
-                {
-                    <li class="flex gap-3">
-                        <span class="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-ink text-surface"><Icon Name="check" Class="size-3.5" StrokeWidth="2.5" /></span>
-                        <span class="leading-relaxed">@point</span>
-                    </li>
-                }
-            </ul>
-        </div>
-        <div class="rounded-3xl border border-line bg-card p-6 shadow-sm sm:p-8">
-            <p class="eyebrow mb-4">The definitions we check against</p>
-            <dl class="space-y-4 font-mono text-sm">
-                @foreach (var (kind, tuple, rule) in Definitions)
-                {
-                    <div class="rounded-xl border border-line bg-surface/50 px-4 py-3">
-                        <dt class="flex items-center justify-between font-sans text-xs text-muted">@kind</dt>
-                        <dd class="mt-1 text-base">@tuple</dd>
-                        <dd class="mt-1 text-xs text-muted">@rule</dd>
-                    </div>
-                }
-            </dl>
-        </div>
-    </div>
-</section>
-
-<section class="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-    <p class="eyebrow mb-3">What we cover</p>
-    <h2 class="max-w-2xl font-display text-4xl leading-tight">Supported chapters and topics</h2>
-    <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        @foreach (var (chapter, title, topics) in Chapters)
-        {
-            <div class="rounded-2xl border border-line bg-card p-5">
-                <p class="font-mono text-xs text-muted">@chapter</p>
-                <h3 class="mt-1 font-display text-xl">@title</h3>
-                <ul class="mt-4 space-y-2 text-sm">
-                    @foreach (var slug in topics)
-                    {
-                        var topic = TheoryNotes.Topics.First(t => t.Slug == slug);
-                        <li>
-                            <a href="@($"study/{slug}")" class="group flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition hover:bg-soft">
-                                <span>@topic.Title</span>
-                                <Icon Name="chevron-right" Class="size-3.5 text-muted transition group-hover:translate-x-0.5" />
-                            </a>
-                        </li>
-                    }
-                </ul>
-            </div>
-        }
-    </div>
-</section>
-
-<section class="border-y border-line bg-soft/60">
-    <div class="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-        <p class="eyebrow mb-3">How it works</p>
-        <h2 class="max-w-2xl font-display text-4xl leading-tight">From the definition to a graded answer in four steps</h2>
-        <ol class="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            @for (var i = 0; i < Steps.Length; i++)
-            {
-                var step = Steps[i];
-                <li class="flex flex-col rounded-2xl border border-line bg-card p-5">
-                    <div class="flex items-center gap-3">
-                        <span class="grid size-9 place-items-center rounded-full bg-ink font-mono text-sm font-semibold text-surface">@(i + 1)</span>
-                        <span class="eyebrow">@step.When</span>
-                    </div>
-                    <div class="dot-grid my-5 grid h-28 place-items-center rounded-xl border border-line bg-surface/40">
-                        <Icon Name="@step.Icon" Class="size-10" StrokeWidth="1.25" />
-                    </div>
-                    <h3 class="font-display text-xl">@step.Title</h3>
-                    <p class="mt-2 flex-1 text-sm leading-relaxed text-muted">@step.Text</p>
-                    <a href="@step.Href" class="mt-4 inline-flex items-center gap-1 text-sm font-semibold">Learn more <Icon Name="arrow-right" Class="size-3.5" /></a>
-                </li>
-            }
-        </ol>
-    </div>
-</section>
-
-<section class="mx-auto max-w-7xl px-4 py-20 sm:px-6">
-    <p class="eyebrow mb-3">Who it is for</p>
-    <h2 class="max-w-2xl font-display text-4xl leading-tight">Made for both sides of the classroom</h2>
-    <div class="mt-10 grid gap-5 lg:grid-cols-2">
-        @foreach (var audience in Audiences)
-        {
-            <article class="rounded-3xl border border-line bg-card p-7">
-                <span class="grid size-12 place-items-center rounded-full border border-line"><Icon Name="@audience.Icon" Class="size-5" /></span>
-                <h3 class="mt-5 font-display text-2xl">@audience.Title</h3>
-                <ul class="mt-5 space-y-3 text-sm">
-                    @foreach (var item in audience.Items)
-                    {
-                        <li class="flex gap-3"><Icon Name="check" Class="mt-0.5 size-4 text-pass" /><span>@item</span></li>
-                    }
-                </ul>
-                <a href="@audience.Href" class="btn-pill mt-7">@audience.Action <Icon Name="arrow-right" /></a>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="px-4 pb-20 sm:px-6">
-    <div class="dot-grid mx-auto max-w-7xl overflow-hidden rounded-3xl border border-line bg-card px-6 py-16 text-center sm:px-12">
-        <p class="eyebrow">Don't get stuck in a dead state</p>
-        <h2 class="mx-auto mt-4 max-w-3xl font-display text-4xl leading-tight sm:text-5xl">
-            Start tracing your first computation <span class="text-muted/60">today.</span>
-        </h2>
-        <p class="mx-auto mt-4 max-w-xl text-muted">No installation, no account needed to experiment. Sign in when you want to save machines and submit answers.</p>
-        <div class="mt-8 flex flex-wrap justify-center gap-3">
-            <a href="sandbox" class="btn-pill btn-pill-primary">Launch Studio <Icon Name="arrow-right" /></a>
-            <a href="study" class="btn-pill bg-surface/60">Read the notes</a>
-        </div>
-    </div>
-</section>
+    <footer class="px-4 py-16 text-center text-sm text-muted">
+        Developed for CSIT321 · Applications Development and Emerging Technologies
+    </footer>
+</div>
 
 @code {
-    private sealed record Step(string When, string Title, string Text, string Icon, string Href);
-    private sealed record Audience(string Title, string Icon, string[] Items, string Action, string Href);
+    private sealed record Card(string Icon, string Title, string Text, string Href);
 
-    private static readonly (string Label, string[] Items)[] Credits =
+    private static readonly Card[] Cards =
     [
-        ("Aligned with", ["Elements of the Theory of Computation, 2nd ed."]),
-        ("Built for", ["CSIT321", "Automata theory courses"]),
-        ("Powered by", ["Blazor WebAssembly", "Supabase", "Gemini"])
-    ];
-
-    private static readonly (string Slug, string Name, string Formal, string Icon)[] Checkers =
-    [
-        ("dfa", "DFA", "(K, Σ, δ, s, F)", "graph"),
-        ("nfa", "NFA", "Δ ⊆ K × Σ* × K", "graph"),
-        ("pda", "PDA", "(K, Σ, Γ, Δ, s, F)", "stack"),
-        ("tm", "Turing machine", "(K, Σ, δ, s, H)", "tape"),
-        ("cfg", "Grammar", "G = (V, Σ, R, S)", "grammar"),
-        ("regex", "Regular expression", "∅, e, ∪, ·, *", "regex")
-    ];
-
-    private (string Value, string Label)[] Stats =>
-    [
-        (Checkers.Length.ToString(), "checkers and simulators"),
-        (SampleLibrary.All.Count.ToString(), "worked examples to open"),
-        (TheoryNotes.Topics.Count.ToString(), "theory topics"),
-        ("2", "builders: graphical and tabular")
-    ];
-
-    private static readonly string[] Points =
-    [
-        "Graphical and tabular builders that stay in sync, for DFA, NFA, PDA and Turing machines.",
-        "Step-by-step playback of every configuration, with the stack and tape shown live.",
-        "Checkers that enforce the textbook definitions and explain exactly what is wrong.",
-        "CodeChum-style problems graded automatically against visible and hidden test cases.",
-        "Study notes and an AI practice generator whose answers ProfAlan verifies."
-    ];
-
-    private static readonly (string Kind, string Tuple, string Rule)[] Definitions =
-    [
-        ("Deterministic finite automaton", "M = (K, Σ, δ, s, F)", "accepts iff (s, w) ⊢* (q, e), q ∈ F"),
-        ("Pushdown automaton", "M = (K, Σ, Γ, Δ, s, F)", "accepts iff (s, w, e) ⊢* (p, e, e), p ∈ F"),
-        ("Turing machine", "M = (K, Σ, δ, s, H)", "starts at (s, ▷⊔w), halts in H")
-    ];
-
-    private static readonly (string Chapter, string Title, string[] Topics)[] Chapters =
-    [
-        ("Chapter 1", "Sets, relations and languages", ["languages", "regex"]),
-        ("Chapter 2", "Finite automata", ["dfa", "nfa"]),
-        ("Chapter 3", "Context-free languages", ["cfg", "pda"]),
-        ("Chapter 4", "Turing machines", ["tm"])
-    ];
-
-    private static readonly Step[] Steps =
-    [
-        new("Before you build", "Learn the definition", "Read the notes for the topic and open its worked example.", "book", "study"),
-        new("While you build", "Draw or tabulate", "Place states and arrows, or fill in δ row by row. The checker flags anything invalid.", "graph", "sandbox"),
-        new("While you test", "Trace the computation", "Step through each configuration and see exactly where a string is accepted or rejected.", "play", "sandbox?sample=pda-anbn"),
-        new("When you're ready", "Submit for grading", "Run the sample cases, then submit against the hidden ones and track your attempts.", "checks", "quizzes")
-    ];
-
-    private static readonly Audience[] Audiences =
-    [
-        new("For students", "graduation",
-            ["Practice with worked examples from the midterm review.", "See which configuration goes wrong instead of guessing.", "Generate unlimited practice problems with your own Gemini key."],
-            "Start practicing", "sandbox"),
-        new("For instructors", "book",
-            ["Publish problems with visible and hidden test cases.", "Label test strings automatically from a reference regex or grammar.", "Review every student's submissions and scores."],
-            "Create a problem", "quizzes/create")
+        new("graph", "Finite Automata", "Trace strings through DFAs and NFAs drawn as state diagrams or transition tables, with instant visual feedback.", "sandbox?kind=dfa"),
+        new("grammar", "Context-Free Grammar", "Understand the production rules that generate a language, with leftmost derivations and parse trees.", "sandbox?kind=cfg"),
+        new("stack", "Pushdown Automaton", "Monitor stack memory visually as you step through non-regular languages.", "sandbox?kind=pda"),
+        new("tape", "Turing Machine", "Watch the read/write head move across the tape, one configuration at a time.", "sandbox?kind=tm"),
+        new("checks", "Quiz Arena", "Solve problems against visible and hidden test cases and get graded automatically.", "quizzes"),
+        new("book", "Study Area", "Read notes aligned with the textbook and generate practice problems with AI.", "study")
     ];
 }
