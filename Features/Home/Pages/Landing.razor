@@ -1,67 +1,139 @@
 @page "/"
 @layout BareLayout
 
-<PageTitle>ProfAlan Studio</PageTitle>
+<PageTitle>ProfAlan · Automata theory studio</PageTitle>
 
-<div class="dot-grid flex min-h-screen flex-col">
-    <header class="flex items-center justify-end gap-2 px-4 pt-5 sm:px-8">
-        <AuthorizeView>
-            <Authorized>
-                <a href="dashboard" class="btn-pill px-4 py-2">Dashboard</a>
-            </Authorized>
-            <NotAuthorized>
-                <a href="login" class="btn-pill px-4 py-2">Sign in</a>
-            </NotAuthorized>
-        </AuthorizeView>
-        <ThemePicker />
+<div class="grid-paper-soft relative flex min-h-screen flex-col overflow-hidden">
+    <header class="relative z-10 mx-auto flex w-full max-w-7xl items-center gap-8 px-4 py-6 sm:px-8">
+        <a href="" class="flex items-center gap-2.5">
+            <BrandMark Class="size-9 text-ink" />
+            <span class="font-display text-2xl">ProfAlan</span>
+        </a>
+        <nav class="hidden items-center gap-8 text-sm font-semibold text-muted md:flex">
+            <a href="#features" class="transition hover:text-ink">Features</a>
+            <a href="#about" class="transition hover:text-ink">About us</a>
+        </nav>
+        <div class="ml-auto flex items-center gap-3 sm:gap-5">
+            <ThemePicker />
+            <AuthorizeView>
+                <Authorized>
+                    <a href="dashboard" class="rounded-full bg-card px-6 py-3 text-sm font-semibold shadow-sm transition hover:shadow-md">Dashboard</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login" class="hidden text-sm font-semibold transition hover:opacity-70 sm:inline">Sign in</a>
+                    <a href="register" class="rounded-full bg-card px-6 py-3 text-sm font-semibold shadow-sm transition hover:shadow-md">Sign up</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
     </header>
 
-    <main class="flex-1">
-        <section class="mx-auto flex max-w-4xl flex-col items-center px-4 pt-12 text-center sm:px-6 sm:pt-16">
-            <span class="fade-up grid size-20 place-items-center rounded-2xl bg-ink text-surface shadow-lg">
-                <BrandMark Class="size-11" />
-            </span>
-            <h1 class="fade-up mt-10 font-display text-6xl leading-none sm:text-8xl" style="animation-delay:.08s">
-                ProfAlan <span class="text-muted/70">Studio</span>
+    <main class="relative flex-1">
+        <section class="relative mx-auto max-w-7xl px-4 pb-24 pt-16 text-center sm:px-8 sm:pt-24">
+            @foreach (var tile in Tiles)
+            {
+                <span class="@($"float-tile absolute hidden place-items-center rounded-2xl bg-card font-mono font-semibold shadow-lg lg:grid {tile.Position}")"
+                      style="@($"--tilt:{tile.Tilt}deg; animation-delay:{tile.Delay}s")" aria-hidden="true">@tile.Text</span>
+            }
+            @foreach (var spark in Sparkles)
+            {
+                <svg viewBox="0 0 24 24" class="@($"sparkle absolute hidden text-highlight lg:block {spark}")" aria-hidden="true">
+                    <path d="M12 0c.8 6.6 5.4 11.2 12 12-6.6.8-11.2 5.4-12 12-.8-6.6-5.4-11.2-12-12C6.6 11.2 11.2 6.6 12 0Z" fill="currentColor" />
+                </svg>
+            }
+
+            <h1 class="fade-up relative mx-auto max-w-5xl font-display text-5xl leading-[1.15] sm:text-7xl">
+                <span class="relative inline-block">
+                    <svg viewBox="0 0 40 40" class="absolute -left-10 -top-9 size-12 text-highlight sm:-left-12 sm:-top-11 sm:size-14" aria-hidden="true">
+                        <path d="M6 30 16 24M10 14l12 8M22 4l6 14" stroke="currentColor" stroke-width="4.5" stroke-linecap="round" />
+                    </svg>
+                    <span class="marker">Interactive</span>
+                </span>
+                Studio<br class="hidden sm:block" /> for Automata Theory<br class="hidden sm:block" /> and Formal Languages
             </h1>
-            <p class="fade-up mt-12 max-w-3xl text-lg leading-loose text-muted sm:text-xl" style="animation-delay:.16s">
-                Explore the theory of computation through interactive visualization. Build and simulate
-                Finite Automata, Pushdown Automata, Turing Machines, Context-Free Grammars and Regular Expressions in real time.
+
+            <p class="fade-up mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-muted" style="animation-delay:.1s">
+                Build DFAs, PDAs and Turing machines, trace every configuration step by step,
+                and get graded on hidden test cases, all faithful to Lewis &amp; Papadimitriou.
             </p>
-            <a href="sandbox" class="fade-up btn-pill btn-pill-primary mt-12 px-10 py-5 text-lg" style="animation-delay:.24s">
-                Launch Application <Icon Name="arrow-right" Class="size-5" />
-            </a>
+
+            <AuthorizeView>
+                <Authorized>
+                    <a href="dashboard" class="raised-button fade-up mt-12" style="animation-delay:.2s">Go to dashboard</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login" class="raised-button fade-up mt-12" style="animation-delay:.2s">Sign in</a>
+                    <p class="fade-up mt-6 text-sm text-muted" style="animation-delay:.25s">
+                        New here? <a href="register" class="font-semibold text-ink underline underline-offset-4">Create a free account</a>
+                    </p>
+                </NotAuthorized>
+            </AuthorizeView>
         </section>
 
-        <section class="mx-auto mt-28 grid max-w-6xl gap-6 px-4 sm:px-6 md:grid-cols-2 lg:grid-cols-3" aria-label="What you can do">
+        <div class="mx-auto flex max-w-6xl items-center gap-6 px-4 sm:px-8" aria-hidden="true">
+            <span class="h-px flex-1 border-t-4 border-dotted border-line"></span>
+            <span class="font-display text-2xl text-muted sm:text-3xl">Grounded in the textbook</span>
+            <span class="h-px flex-1 border-t-4 border-dotted border-line"></span>
+        </div>
+        <p class="mt-4 text-center font-mono text-sm text-muted">Lewis &amp; Papadimitriou, <em>Elements of the Theory of Computation</em>, 2nd edition</p>
+
+        <section id="features" class="mx-auto mt-20 grid max-w-6xl scroll-mt-8 gap-6 px-4 sm:px-8 md:grid-cols-2 lg:grid-cols-3" aria-label="Features">
             @foreach (var card in Cards)
             {
-                <a href="@card.Href" class="group rounded-3xl border border-line bg-card p-8 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                    <span class="grid size-12 place-items-center rounded-xl border border-line bg-surface/60 transition group-hover:bg-ink group-hover:text-surface">
+                <article class="rounded-3xl border border-line bg-card p-8 shadow-sm">
+                    <span class="grid size-12 place-items-center rounded-xl border border-line bg-surface/60">
                         <Icon Name="@card.Icon" Class="size-5" />
                     </span>
                     <h2 class="mt-8 text-xl font-semibold leading-snug">@card.Title</h2>
                     <p class="mt-3 leading-relaxed text-muted">@card.Text</p>
-                </a>
+                </article>
             }
+        </section>
+
+        <section id="about" class="mx-auto mt-24 max-w-3xl scroll-mt-8 px-4 text-center sm:px-8">
+            <p class="eyebrow">About us</p>
+            <h2 class="mt-3 font-display text-3xl sm:text-4xl">Built for the automata theory classroom</h2>
+            <p class="mt-5 leading-relaxed text-muted">
+                ProfAlan is a final project for CSIT321, Applications Development and Emerging Technologies.
+                It gives students one place to learn, simulate and be assessed on formal languages, and gives
+                instructors CodeChum-style problems with hidden test cases.
+            </p>
         </section>
     </main>
 
-    <footer class="px-4 py-16 text-center text-sm text-muted">
+    <footer class="mt-24 border-t border-line px-4 py-10 text-center text-sm text-muted">
         Developed for CSIT321 · Applications Development and Emerging Technologies
     </footer>
 </div>
 
 @code {
-    private sealed record Card(string Icon, string Title, string Text, string Href);
+    private sealed record Tile(string Text, string Position, int Tilt, double Delay);
+    private sealed record Card(string Icon, string Title, string Text);
+
+    private static readonly Tile[] Tiles =
+    [
+        new("δ", "left-[6%] top-[4%] size-20 text-3xl", -8, 0),
+        new("Σ*", "left-[1%] top-[38%] size-20 text-2xl", 6, 0.6),
+        new("⊢*", "left-[8%] top-[72%] size-24 text-3xl", -5, 1.2),
+        new("Γ", "right-[7%] top-[2%] size-16 text-2xl", 7, 0.3),
+        new("▷⊔", "right-[2%] top-[42%] size-20 text-2xl", -6, 0.9),
+        new("q₀", "right-[9%] top-[74%] size-20 text-2xl", 8, 1.5)
+    ];
+
+    private static readonly string[] Sparkles =
+    [
+        "left-[12%] top-[56%] size-7",
+        "left-[24%] top-[92%] size-5",
+        "right-[16%] top-[26%] size-6",
+        "right-[22%] top-[66%] size-6"
+    ];
 
     private static readonly Card[] Cards =
     [
-        new("graph", "Finite Automata", "Trace strings through DFAs and NFAs drawn as state diagrams or transition tables, with instant visual feedback.", "sandbox?kind=dfa"),
-        new("grammar", "Context-Free Grammar", "Understand the production rules that generate a language, with leftmost derivations and parse trees.", "sandbox?kind=cfg"),
-        new("stack", "Pushdown Automaton", "Monitor stack memory visually as you step through non-regular languages.", "sandbox?kind=pda"),
-        new("tape", "Turing Machine", "Watch the read/write head move across the tape, one configuration at a time.", "sandbox?kind=tm"),
-        new("checks", "Quiz Arena", "Solve problems against visible and hidden test cases and get graded automatically.", "quizzes"),
-        new("book", "Study Area", "Read notes aligned with the textbook and generate practice problems with AI.", "study")
+        new("graph", "Finite Automata", "Trace strings through DFAs and NFAs drawn as state diagrams or transition tables, with instant visual feedback."),
+        new("grammar", "Context-Free Grammar", "Understand the production rules that generate a language, with leftmost derivations and parse trees."),
+        new("stack", "Pushdown Automaton", "Monitor stack memory visually as you step through non-regular languages."),
+        new("tape", "Turing Machine", "Watch the read/write head move across the tape, one configuration at a time."),
+        new("checks", "Quiz Arena", "Solve problems against visible and hidden test cases and get graded automatically."),
+        new("wand", "AI Study Area", "Read notes aligned with the textbook and practice with problems generated by Google Gemini.")
     ];
 }
