@@ -487,3 +487,6 @@ wwwroot/css/app.css
 # Local configuration; appsettings.json is generated from .env by scripts/write-config.mjs
 .env
 wwwroot/appsettings.json
+
+# Supabase CLI cache
+supabase/.temp/
