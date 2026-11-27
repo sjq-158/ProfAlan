@@ -1,0 +1,21 @@
+@* Renders a TM tape with the head pointer under the scanned cell. *@
+<div class="overflow-x-auto pb-1">
+    <div class="flex w-max gap-1 font-mono">
+        @for (var i = 0; i < Cells.Length; i++)
+        {
+            var scanned = i == Head;
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-[10px] text-muted">@i</span>
+                <span class="@($"grid size-9 place-items-center rounded-md border text-sm transition {(scanned ? "border-ink bg-ink text-surface" : "border-line bg-card")}")">@Cells[i]</span>
+                <svg viewBox="0 0 10 8" class="@($"h-2 w-3 {(scanned ? "text-ink" : "text-transparent")}")" aria-hidden="true"><path d="M5 0 10 8H0z" fill="currentColor" /></svg>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Tape { get; set; } = "";
+    [Parameter] public int Head { get; set; }
+
+    private string Cells => Tape.TrimEnd(Symbols.Blank).PadRight(Math.Max(Head + 4, 8), Symbols.Blank);
+}

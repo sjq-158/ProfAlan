@@ -1,0 +1,28 @@
+@* The PDA stack drawn top-down; the leftmost symbol of the stack string is the top. *@
+<div class="flex flex-col gap-1 font-mono">
+    @if (Stack.Length == 0)
+    {
+        <span class="rounded-md border border-dashed border-line px-3 py-2 text-center text-xs text-muted">empty (e)</span>
+    }
+    else
+    {
+        @for (var i = 0; i < Math.Min(Stack.Length, 12); i++)
+        {
+            <div class="flex items-center gap-2">
+                <span class="@($"grid h-8 w-12 place-items-center rounded-md border text-sm {(i == 0 ? "border-ink bg-ink text-surface" : "border-line bg-card")}")">@Stack[i]</span>
+                @if (i == 0)
+                {
+                    <span class="text-[11px] text-muted">top</span>
+                }
+            </div>
+        }
+        @if (Stack.Length > 12)
+        {
+            <span class="text-xs text-muted">+ @(Stack.Length - 12) more below</span>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Stack { get; set; } = "";
+}

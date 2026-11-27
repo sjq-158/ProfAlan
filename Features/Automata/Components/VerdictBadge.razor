@@ -1,0 +1,19 @@
+@switch (Verdict)
+{
+    case Verdict.Accepted:
+        <span class="badge-pass"><Icon Name="check" Class="size-3" /> Accepted</span>
+        break;
+    case Verdict.Rejected:
+        <span class="badge-fail"><Icon Name="x" Class="size-3" /> Rejected</span>
+        break;
+    case Verdict.DidNotHalt:
+        <span class="badge-warn"><Icon Name="clock" Class="size-3" /> Did not halt</span>
+        break;
+    case Verdict.InvalidInput:
+        <span class="badge-warn"><Icon Name="alert" Class="size-3" /> Invalid input</span>
+        break;
+}
+
+@code {
+    [Parameter] public Verdict Verdict { get; set; }
+}

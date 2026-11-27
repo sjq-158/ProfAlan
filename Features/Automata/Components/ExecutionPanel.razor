@@ -1,0 +1,286 @@
+@implements IDisposable
+@inject IJSRuntime JS
+
+<section class="card">
+    <div class="card-header">
+        <p class="eyebrow">Step-by-step visualizer</p>
+        @if (result is not null && AtEnd)
+        {
+            <VerdictBadge Verdict="result.Verdict" />
+        }
+        else if (result is not null)
+        {
+            <span class="badge-muted font-mono">step @index / @(result.Path.Count - 1)</span>
+        }
+    </div>
+
+    <div class="space-y-4 p-4">
+        <form class="flex gap-2" @onsubmit="RunAsync" @onsubmit:preventDefault="true">
+            <label class="sr-only" for="@($"{id}-input")">Input string w</label>
+            <div class="relative flex-1">
+                <span class="pointer-events-none absolute inset-y-0 left-3 grid place-items-center font-mono text-sm text-muted">w =</span>
+                <input id="@($"{id}-input")" class="field field-mono pl-11" @bind="input" @bind:event="oninput" placeholder="e (empty string)" autocomplete="off" spellcheck="false" />
+            </div>
+            <button type="submit" class="btn btn-primary"><Icon Name="play" /> Run</button>
+        </form>
+
+        @if (result?.Verdict == Verdict.InvalidInput)
+        {
+            <p class="flex items-start gap-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn"><Icon Name="alert" Class="mt-0.5 size-4" /> @result.Explanation</p>
+        }
+        else if (stale)
+        {
+            <p class="flex items-center gap-2 text-xs text-muted"><Icon Name="info" /> The definition changed. Run again to see the new computation.</p>
+        }
+
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1">
+                <button type="button" class="btn-icon" title="Reset" aria-label="Reset" disabled="@(!HasTrace || index == 0)" @onclick="ResetAsync"><Icon Name="reset" /></button>
+                <button type="button" class="btn-icon" title="Step back" aria-label="Step back" disabled="@(!HasTrace || index == 0)" @onclick="() => MoveAsync(-1)"><Icon Name="step-back" /></button>
+                @if (playing)
+                {
+                    <button type="button" class="btn-icon border-ink bg-ink text-surface hover:bg-ink/90" title="Pause" aria-label="Pause" @onclick="Pause"><Icon Name="pause" /></button>
+                }
+                else
+                {
+                    <button type="button" class="btn-icon border-ink bg-ink text-surface hover:bg-ink/90" title="Play" aria-label="Play" disabled="@(!HasTrace)" @onclick="PlayAsync"><Icon Name="play" /></button>
+                }
+                <button type="button" class="btn-icon" title="Step forward" aria-label="Step forward" disabled="@(!HasTrace || AtEnd)" @onclick="() => MoveAsync(1)"><Icon Name="step-forward" /></button>
+            </div>
+            <label class="flex items-center gap-2 text-xs text-muted">
+                Speed
+                <select class="field w-auto py-1 text-xs" @bind="speed">
+                    <option value="0">0.5×</option>
+                    <option value="1">1×</option>
+                    <option value="2">2×</option>
+                    <option value="3">4×</option>
+                </select>
+            </label>
+        </div>
+
+        @if (Current is { } c)
+        {
+            <div class="grid gap-4 rounded-lg border border-line bg-surface/60 p-3 @(Machine.Kind == MachineKind.Pda ? "grid-cols-[1fr_auto]" : "")">
+                <div class="min-w-0 space-y-3">
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="text-muted">State</span>
+                        <span class="rounded-md bg-ink px-2 py-0.5 font-mono text-surface">@c.State</span>
+                        @if (RuleAt(index) is { } rule)
+                        {
+                            <span class="truncate font-mono text-xs text-muted">via @rule.Formal(Machine.Kind)</span>
+                        }
+                    </div>
+
+                    @if (Machine.Kind == MachineKind.Turing)
+                    {
+                        <div>
+                            <p class="mb-1.5 text-xs text-muted">Tape</p>
+                            <TapeView Tape="@c.Tape" Head="c.Head" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <p class="mb-1.5 text-xs text-muted">Input · @c.Position of @c.Input.Length read</p>
+                            <div class="flex flex-wrap gap-1 font-mono">
+                                @if (c.Input.Length == 0)
+                                {
+                                    <span class="text-sm text-muted">e</span>
+                                }
+                                @for (var i = 0; i < c.Input.Length; i++)
+                                {
+                                    var read = i < c.Position;
+                                    var next = i == c.Position;
+                                    <span class="@($"grid size-8 place-items-center rounded-md border text-sm {(next ? "border-ink ring-2 ring-ink/20" : "border-line")} {(read ? "bg-soft text-muted line-through decoration-1" : "bg-card")}")">@c.Input[i]</span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                @if (Machine.Kind == MachineKind.Pda)
+                {
+                    <div>
+                        <p class="mb-1.5 text-xs text-muted">Stack</p>
+                        <StackView Stack="@c.Stack" />
+                    </div>
+                }
+            </div>
+
+            <div>
+                <p class="mb-1.5 text-xs text-muted">Configurations</p>
+                <div @ref="historyBox" class="h-48 overflow-y-auto rounded-lg border border-line bg-card font-mono text-[13px]">
+                    <Virtualize Items="indices" ItemSize="RowHeight" Context="i" OverscanCount="12">
+                        <button type="button" style="height:@(RowHeight)px" @onclick="() => JumpAsync(i)"
+                                class="@($"flex w-full items-center gap-2 px-3 text-left transition {(i == index ? "bg-ink text-surface" : "hover:bg-soft")}")">
+                            <span class="w-5 shrink-0 text-right text-[11px] opacity-60">@(i == 0 ? "" : "⊢")</span>
+                            @if (Machine.Kind == MachineKind.Turing)
+                            {
+                                var tc = result!.Path[i];
+                                var tape = TapeText(tc);
+                                <span class="truncate">(@tc.State, @tape[..tc.Head]<u class="underline-offset-2">@tape[tc.Head]</u>@tape[(tc.Head + 1)..])</span>
+                            }
+                            else
+                            {
+                                <span class="truncate">@ConfigurationNotation.Format(Machine.Kind, result!.Path[i])</span>
+                            }
+                        </button>
+                    </Virtualize>
+                </div>
+            </div>
+
+            @if (AtEnd)
+            {
+                <p class="text-sm text-muted">@result!.Explanation</p>
+            }
+        }
+        else if (result is null)
+        {
+            <p class="rounded-lg border border-dashed border-line px-3 py-6 text-center text-sm text-muted">
+                Enter a string and press Run to trace the computation one configuration at a time.
+            </p>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public Automaton Machine { get; set; } = default!;
+    [Parameter] public int Revision { get; set; }
+    [Parameter] public EventCallback<Configuration?> OnConfigurationChanged { get; set; }
+    [Parameter] public EventCallback<Verdict?> OnOutcomeChanged { get; set; }
+    [Parameter] public EventCallback<RunRecord> OnRunCompleted { get; set; }
+
+    private const int RowHeight = 28;
+    private static readonly int[] Delays = [1100, 600, 300, 120];
+
+    private readonly string id = Guid.NewGuid().ToString("N")[..8];
+    private ElementReference historyBox;
+    private string input = "";
+    private ComputationResult? result;
+    private List<int> indices = [];
+    private int index;
+    private int speed = 1;
+    private bool playing;
+    private bool stale;
+    private int runRevision;
+    private CancellationTokenSource? playback;
+
+    private bool HasTrace => result is { Path.Count: > 0 };
+    private bool AtEnd => result is not null && (result.Path.Count == 0 || index >= result.Path.Count - 1);
+    private Configuration? Current => HasTrace ? result!.Path[index] : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (result is not null && Revision != runRevision && !stale)
+        {
+            stale = true;
+            Pause();
+            result = null;
+            indices = [];
+            await PublishAsync();
+        }
+    }
+
+    private TransitionRule? RuleAt(int i) =>
+        result?.Path[i].RuleId is { } ruleId ? Machine.Transitions.FirstOrDefault(t => t.Id == ruleId) : null;
+
+    private static string TapeText(Configuration c)
+    {
+        var tape = c.Tape.TrimEnd(Symbols.Blank);
+        return tape.Length <= c.Head ? tape.PadRight(c.Head + 1, Symbols.Blank) : tape;
+    }
+
+    private async Task RunAsync()
+    {
+        Pause();
+        var word = Symbols.IsEmpty(input) && !Machine.Alphabet.Contains('e') ? "" : input.Trim();
+        result = MachineEngines.For(Machine).Run(word);
+        indices = Enumerable.Range(0, result.Path.Count).ToList();
+        index = 0;
+        stale = false;
+        runRevision = Revision;
+        await PublishAsync();
+
+        if (result.Verdict != Verdict.InvalidInput)
+        {
+            await OnRunCompleted.InvokeAsync(new RunRecord(word, result));
+            await PlayAsync();
+        }
+    }
+
+    private async Task PlayAsync()
+    {
+        if (!HasTrace) return;
+        if (AtEnd) index = 0;
+
+        playback?.Cancel();
+        playback = new CancellationTokenSource();
+        var token = playback.Token;
+        playing = true;
+        await PublishAsync();
+
+        try
+        {
+            while (!AtEnd)
+            {
+                await Task.Delay(Delays[speed], token);
+                index++;
+                await PublishAsync();
+                StateHasChanged();
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        playing = false;
+        StateHasChanged();
+    }
+
+    private void Pause()
+    {
+        playback?.Cancel();
+        playing = false;
+    }
+
+    private async Task MoveAsync(int delta)
+    {
+        Pause();
+        if (!HasTrace) return;
+        index = Math.Clamp(index + delta, 0, result!.Path.Count - 1);
+        await PublishAsync();
+    }
+
+    private async Task JumpAsync(int target)
+    {
+        Pause();
+        index = target;
+        await PublishAsync();
+    }
+
+    private async Task ResetAsync()
+    {
+        Pause();
+        index = 0;
+        await PublishAsync();
+    }
+
+    private async Task PublishAsync()
+    {
+        await OnConfigurationChanged.InvokeAsync(Current);
+        await OnOutcomeChanged.InvokeAsync(AtEnd && HasTrace ? result!.Verdict : null);
+        if (HasTrace)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("profAlan.scrollToOffset", historyBox, index * RowHeight - 80);
+            }
+            catch (Exception ex) when (ex is JSException or InvalidOperationException)
+            {
+                // The history list is not rendered yet on the very first frame.
+            }
+        }
+    }
+
+    public void Dispose() => playback?.Cancel();
+}

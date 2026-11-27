@@ -36,6 +36,10 @@ window.profAlan = {
         if (element) element.scrollIntoView({ block: "nearest", behavior: "smooth" });
     },
 
+    scrollToOffset: function (element, top) {
+        if (element) element.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    },
+
     focus: function (element) {
         if (element) element.focus();
     },
