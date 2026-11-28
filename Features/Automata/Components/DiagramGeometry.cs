@@ -17,7 +17,7 @@ public sealed record EdgeShape(
 /// Lays out arrows the way state diagrams are drawn by hand: forward arrows straight with
 /// the label above, a reverse arrow arcing below, self-loops on the free side of the state,
 /// and every rule on an arrow stacked as its own line. Finite automata use the small-dot
-/// notation from the midterm review; PDAs and TMs keep labelled circles.
+/// notation; PDAs and TMs keep labelled circles.
 /// </summary>
 public static class DiagramGeometry
 {

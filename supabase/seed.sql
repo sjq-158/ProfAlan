@@ -1,9 +1,9 @@
--- Starter problems from the midterm review, published by course staff (no author account).
+-- Starter problems published by ProfAlan (no author account).
 -- Expected verdicts follow the reference language noted beside each problem.
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'Starts with a and ends with bb',
+    values (null, 'ProfAlan', 'Starts with a and ends with bb',
             'Construct a DFA for L = { w ∈ {a,b}* | w starts with a and ends with bb }.', 'dfa', 'ab', true, 4, 6)
     returning id
 ) -- reference: a(a ∪ b)*bb
@@ -16,7 +16,7 @@ select q.id, v.position, v.input, v.should_accept, v.is_hidden from q, (values
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'Number of b''s divisible by 3',
+    values (null, 'ProfAlan', 'Number of b''s divisible by 3',
             'Construct a DFA for L = { w ∈ {a,b}* | the number of b''s in w is divisible by 3 }.', 'dfa', 'ab', true, 4, 5)
     returning id
 ) -- reference: a*(ba*ba*ba*)*
@@ -29,7 +29,7 @@ select q.id, v.position, v.input, v.should_accept, v.is_hidden from q, (values
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'Contains bba',
+    values (null, 'ProfAlan', 'Contains bba',
             'Construct an NFA for L = { w ∈ {a,b}* | w contains bba as a substring }.', 'nfa', 'ab', true, 4, 5)
     returning id
 ) -- reference: (a ∪ b)*bba(a ∪ b)*
@@ -42,7 +42,7 @@ select q.id, v.position, v.input, v.should_accept, v.is_hidden from q, (values
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'aa or bb, then ab blocks',
+    values (null, 'ProfAlan', 'aa or bb, then ab blocks',
             'Write a regular expression for strings over {a,b} that begin with aa or bb followed by any number of ab blocks.', 'regex', 'ab', true, 4, 5)
     returning id
 ) -- reference: (aa ∪ bb)(ab)*
@@ -55,7 +55,7 @@ select q.id, v.position, v.input, v.should_accept, v.is_hidden from q, (values
 
 with q as (
     insert into public.quizzes (author_id, author_name, title, prompt, answer_kind, alphabet, is_published, visible_count, hidden_count)
-    values (null, 'ProfAlan course staff', 'Equal a''s then b''s',
+    values (null, 'ProfAlan', 'Equal a''s then b''s',
             'Construct a PDA for L = { aⁿbⁿ : n ≥ 0 }. Accept by final state with an empty stack.', 'pda', 'ab', true, 4, 5)
     returning id
 ) -- reference: S → aSb | e

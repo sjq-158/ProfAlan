@@ -7,7 +7,7 @@ public sealed record SampleMachine(string Id, string Title, string Language, Fun
     public MachineKind Kind => Build().Kind;
 }
 
-/// <summary>Worked examples, several taken from the midterm review and from Lewis &amp; Papadimitriou.</summary>
+/// <summary>Worked examples, several taken from Lewis &amp; Papadimitriou.</summary>
 public static class SampleLibrary
 {
     public static readonly IReadOnlyList<SampleMachine> All =

@@ -2,7 +2,7 @@ using ProfAlan.Features.Quizzes.Models;
 
 namespace ProfAlan.Features.Quizzes.Services;
 
-/// <summary>Starter problems from the midterm review, shown in demo mode so the arena is never empty.</summary>
+/// <summary>Starter problems shown in demo mode so the arena is never empty.</summary>
 public static class SeedQuizzes
 {
     public static IReadOnlyList<(Quiz Quiz, List<TestCase> Cases)> Build()
@@ -39,7 +39,7 @@ public static class SeedQuizzes
         {
             Id = DeterministicId(title),
             AuthorId = null,
-            AuthorName = "ProfAlan course staff",
+            AuthorName = "ProfAlan",
             Title = title,
             Prompt = prompt,
             AnswerKind = kind,

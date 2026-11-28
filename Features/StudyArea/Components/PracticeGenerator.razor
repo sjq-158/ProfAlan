@@ -58,7 +58,7 @@
                             <label class="label" for="gen-diff">Difficulty</label>
                             <select id="gen-diff" class="field" @bind="difficulty">
                                 <option>introductory</option>
-                                <option>midterm level</option>
+                                <option>intermediate</option>
                                 <option>challenging</option>
                             </select>
                         </div>
@@ -205,7 +205,7 @@
 @code {
     private string mode = "problem";
     private AnswerKind answerKind = AnswerKind.Dfa;
-    private string difficulty = "midterm level";
+    private string difficulty = "intermediate";
     private string alphabet = "ab";
     private string topic = "";
     private string languageText = "";

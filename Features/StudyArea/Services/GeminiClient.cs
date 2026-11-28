@@ -29,7 +29,7 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
     {
         var sigma = string.Join(", ", request.Alphabet.ToCharArray());
         var prompt = $$"""
-            You are a teaching assistant for an automata theory course. Write one practice problem.
+            You are a teaching assistant for automata theory and formal languages. Write one practice problem.
             Topic focus: {{request.Topic}}. The solver must submit a {{request.AnswerKind}}. Difficulty: {{request.Difficulty}}.
             Alphabet: {{{sigma}}}.
             {{Notation}}

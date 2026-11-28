@@ -2,13 +2,13 @@ using ProfAlan.Features.StudyArea.Models;
 
 namespace ProfAlan.Features.StudyArea.Services;
 
-/// <summary>Course notes written against Lewis &amp; Papadimitriou, 2nd edition.</summary>
+/// <summary>Theory notes written against Lewis &amp; Papadimitriou, 2nd edition.</summary>
 public static class TheoryNotes
 {
     public static readonly IReadOnlyList<TheoryTopic> Topics =
     [
         new("languages", "Alphabets, strings and languages", "§1.7",
-            "Everything in the course is a set of strings. Fix the vocabulary first.",
+            "Everything in automata theory is a set of strings. Fix the vocabulary first.",
             [
                 new(NoteKind.Definition, "An alphabet Σ is a finite set of symbols. A string over Σ is a finite sequence of symbols from Σ; the empty string is written e. Σ* is the set of all strings over Σ, and a language is any subset of Σ*.",
                     "Σ = {a, b}    Σ* = {e, a, b, aa, ab, ba, bb, aaa, ...}", "Language"),
@@ -49,8 +49,8 @@ public static class TheoryNotes
                     "Precedence: * binds tighter than concatenation, which binds tighter than ∪", "Regular expression"),
                 new(NoteKind.Paragraph, "Kleene's theorem (2.3.2): a language is regular, that is accepted by some finite automaton, exactly when it is L(α) for some regular expression α. The sandbox can turn any expression into an NFA with Thompson's construction."),
                 new(NoteKind.Example, "Strings that start with a and end with bb: a(a ∪ b)*bb. Strings with a number of b's divisible by 3: a*(ba*ba*ba*)*. Strings whose length is divisible by 3: ((a ∪ b)(a ∪ b)(a ∪ b))*.",
-                    "a(a ∪ b)*bb", "From the midterm review"),
-                new(NoteKind.Tip, "In class notes union is often written +, as in (aa + bb)(ab)*. ProfAlan accepts ∪, + and | interchangeably, and e for the empty string.")
+                    "a(a ∪ b)*bb", "Worked example"),
+                new(NoteKind.Tip, "Many notes write union as +, as in (aa + bb)(ab)*. ProfAlan accepts ∪, + and | interchangeably, and e for the empty string.")
             ],
             [new("Open the regex checker", "sandbox?kind=regex")]),
 
