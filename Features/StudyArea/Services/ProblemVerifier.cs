@@ -5,11 +5,23 @@ using ProfAlan.Features.StudyArea.Models;
 
 namespace ProfAlan.Features.StudyArea.Services;
 
-public sealed record VerifiedProblem(Quiz Quiz, List<TestCase> Cases, string ReferenceAnswer, string Hint, IReadOnlyList<string> Notes, bool ReferenceChecked);
+public sealed record VerifiedProblem(
+    Quiz Quiz,
+    List<TestCase> Cases,
+    string ReferenceAnswer,
+    string Hint,
+    IReadOnlyList<string> Notes,
+    bool ReferenceParsed,
+    IReadOnlySet<string> Disagreements)
+{
+    /// <summary>The reference answer parses and agrees with every expected verdict.</summary>
+    public bool IsVerified => ReferenceParsed && Disagreements.Count == 0;
+}
 
 /// <summary>
-/// Never trusts the model's verdicts blindly: inputs outside Σ are dropped, duplicates removed,
-/// and every expected result is recomputed from the reference answer when it parses.
+/// Never trusts the model blindly. Inputs outside Σ and duplicates are dropped, then every
+/// expected verdict is checked against the reference answer. When the two disagree it is not
+/// known which one is wrong, so nothing is overwritten: the problem is reported as unverified.
 /// </summary>
 public static class ProblemVerifier
 {
@@ -35,24 +47,18 @@ public static class ProblemVerifier
         }
         if (dropped > 0) notes.Add($"Dropped {dropped} test case(s) that were duplicates or used symbols outside Σ.");
 
+        var disagreements = new HashSet<string>();
         var oracle = QuizGrader.ReferenceOracle(generated.ReferenceAnswer, out _);
-        if (oracle is not null)
+        if (oracle is null)
         {
-            var corrected = 0;
-            foreach (var c in cases)
-            {
-                var truth = oracle(c.Input);
-                if (truth == c.ShouldAccept) continue;
-                c.ShouldAccept = truth;
-                corrected++;
-            }
-            notes.Add(corrected == 0
-                ? "Every expected verdict agrees with the reference answer."
-                : $"Corrected {corrected} expected verdict(s) that disagreed with the reference answer.");
+            notes.Add("The reference answer could not be parsed, so the expected verdicts could not be checked.");
         }
         else
         {
-            notes.Add("The reference answer could not be parsed, so the expected verdicts are unverified. Check them before publishing.");
+            foreach (var c in cases.Where(c => oracle(c.Input) != c.ShouldAccept)) disagreements.Add(c.Input);
+            notes.Add(disagreements.Count == 0
+                ? "Every expected verdict agrees with the reference answer."
+                : $"The reference answer disagrees with {disagreements.Count} expected verdict(s), marked below. Review them before using this problem.");
         }
 
         if (cases.Count > 0 && cases.All(c => c.IsHidden)) cases[0].IsHidden = false;
@@ -64,6 +70,6 @@ public static class ProblemVerifier
             AnswerKind = kind,
             Alphabet = alphabet
         };
-        return new VerifiedProblem(quiz, cases, generated.ReferenceAnswer, generated.Hint, notes, oracle is not null);
+        return new VerifiedProblem(quiz, cases, generated.ReferenceAnswer, generated.Hint, notes, oracle is not null, disagreements);
     }
 }

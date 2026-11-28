@@ -36,6 +36,8 @@ public sealed class GeminiClient(HttpClient http, SupabaseOptions supabase, IAcc
             The prompt must define the language precisely in set-builder notation, for example
             "Construct a DFA for L = { w ∈ {a,b}* | w ends with bb }".
             referenceAnswer must be a correct regular expression for the language if it is regular, otherwise a context-free grammar.
+            Check referenceAnswer against the prompt carefully, then decide every test case's accept value by testing the input
+            against both the prompt and referenceAnswer; they must agree.
             Give 12 to 16 distinct test cases over the alphabet, including the empty string written as an empty input "",
             with roughly half accepted. Mark about two thirds of them hidden.
             """;

@@ -109,7 +109,7 @@
                         <span class="chip">@problem.Quiz.AnswerKind.Label()</span>
                         <span class="chip">Σ = {@string.Join(", ", problem.Quiz.Alphabet.ToCharArray())}</span>
                     </div>
-                    <span class="@(problem.ReferenceChecked ? "badge-pass" : "badge-warn")">@(problem.ReferenceChecked ? "Verified by ProfAlan" : "Unverified")</span>
+                    <span class="@(problem.IsVerified ? "badge-pass" : "badge-warn")">@(problem.IsVerified ? "Verified by ProfAlan" : "Needs review")</span>
                 </div>
                 <div class="space-y-5 p-5">
                     <div>
@@ -139,8 +139,15 @@
                             <tbody>
                                 @foreach (var c in problem.Cases)
                                 {
-                                    <tr class="border-t border-line">
-                                        <td class="px-4 py-1.5 font-mono">@Symbols.Show(c.Input)</td>
+                                    var disputed = problem.Disagreements.Contains(c.Input);
+                                    <tr class="@($"border-t border-line {(disputed ? "bg-warn/10" : "")}")" title="@(disputed ? "The reference answer gives the opposite verdict" : "")">
+                                        <td class="px-4 py-1.5 font-mono">
+                                            @Symbols.Show(c.Input)
+                                            @if (disputed)
+                                            {
+                                                <Icon Name="alert" Class="ml-1 inline size-3.5 text-warn" />
+                                            }
+                                        </td>
                                         <td class="px-4 py-1.5 font-medium @(c.ShouldAccept ? "text-pass" : "text-fail")">@(c.ShouldAccept ? "Accept" : "Reject")</td>
                                         <td class="px-4 py-1.5 text-muted">@(c.IsHidden ? "Hidden" : "Visible")</td>
                                     </tr>
@@ -182,7 +189,15 @@
         }
         else
         {
-            <div class="grid min-h-[30vh] place-items-center text-muted"><Spinner Class="size-6" /></div>
+            <div class="grid min-h-[30vh] place-items-center text-center text-muted">
+                <div>
+                    <Spinner Class="mx-auto size-6" />
+                    @if (mode == "problem")
+                    {
+                        <p class="mt-3 text-sm">Drafting and checking the problem (attempt @attemptsUsed of @MaxAttempts)…</p>
+                    }
+                </div>
+            </div>
         }
     </div>
 </div>
@@ -202,6 +217,9 @@
     private Func<string, bool>? explainOracle;
     private readonly CancellationTokenSource cancel = new();
 
+    private const int MaxAttempts = 3;
+    private int attemptsUsed;
+
     private bool Ready => Gemini.HasProjectAssistant;
 
 
@@ -220,9 +238,17 @@
         error = null;
         try
         {
-            var generated = await Gemini.GenerateProblemAsync(
-                new GenerationRequest(string.IsNullOrWhiteSpace(topic) ? "any classic topic" : topic, answerKind.Label(), difficulty, alphabet), cancel.Token);
-            problem = ProblemVerifier.Verify(generated with { AnswerKind = answerKind.ToString() });
+            var request = new GenerationRequest(string.IsNullOrWhiteSpace(topic) ? "any classic topic" : topic, answerKind.Label(), difficulty, alphabet);
+
+            // A model can contradict itself; ask again until the reference answer and the labels agree.
+            for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+            {
+                attemptsUsed = attempt;
+                StateHasChanged();
+                var generated = await Gemini.GenerateProblemAsync(request, cancel.Token);
+                problem = ProblemVerifier.Verify(generated with { AnswerKind = answerKind.ToString() });
+                if (problem.IsVerified) break;
+            }
         }
         catch (GeminiException ex)
         {
