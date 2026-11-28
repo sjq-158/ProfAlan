@@ -9,7 +9,7 @@
 
 <PageTitle>@(quiz?.Title ?? "Problem") · ProfAlan</PageTitle>
 
-<div class="mx-auto max-w-[96rem] px-4 py-6 sm:px-6">
+<div class="mx-auto max-w-[96rem] px-4 py-8 sm:px-6">
     <a href="quizzes" class="mb-4 inline-flex items-center gap-1.5 text-sm text-muted transition hover:text-ink">
         <Icon Name="arrow-left" /> All problems
     </a>
@@ -148,7 +148,7 @@
                                 <span class="badge-fail">Not well formed</span>
                             }
                         </div>
-                        <div class="space-y-3 p-4">
+                        <div class="space-y-3 p-5">
                             @if (quiz.AnswerKind == AnswerKind.Regex)
                             {
                                 <input class="field field-mono text-base" value="@textAnswer" @oninput="e => SetTextAnswerAsync(e.Value?.ToString())" placeholder="(a ∪ b)*bb" spellcheck="false" aria-label="Regular expression" />

@@ -21,7 +21,7 @@
                     <span class="badge-warn">Unavailable</span>
                 }
             </div>
-            <div class="space-y-3 p-4 text-sm">
+            <div class="space-y-3 p-5 text-sm">
                 <p class="leading-relaxed">Powered by Google Gemini on the free tier and hosted by ProfAlan, so you can use it right away without an API key.</p>
                 <p class="flex gap-2 text-xs text-muted">
                     <Icon Name="shield" Class="mt-0.5 size-3.5" />
@@ -41,7 +41,7 @@
                     <button type="button" class="@($"tab px-2.5 py-1 {(mode == "explain" ? "tab-active" : "")}")" @onclick='() => mode = "explain"'>Explain a language</button>
                 </div>
             </div>
-            <div class="space-y-3 p-4">
+            <div class="space-y-3 p-5">
                 @if (mode == "problem")
                 {
                     <div>

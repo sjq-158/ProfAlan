@@ -14,7 +14,7 @@
         }
     </div>
 
-    <div class="space-y-3 p-4">
+    <div class="space-y-3 p-5">
         <div class="h-2 overflow-hidden rounded-full bg-soft" role="progressbar" aria-valuenow="@Report.Percent" aria-valuemin="0" aria-valuemax="100">
             <div class="@($"h-full rounded-full transition-all {(Report.IsPerfect ? "bg-pass" : "bg-fail")}")" style="width:@(Report.Percent)%"></div>
         </div>

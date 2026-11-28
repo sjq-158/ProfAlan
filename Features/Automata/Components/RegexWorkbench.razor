@@ -14,7 +14,7 @@
                     <span class="badge-fail">Syntax error</span>
                 }
             </div>
-            <div class="space-y-3 p-4">
+            <div class="space-y-3 p-5">
                 <div>
                     <label class="label" for="regex-text">R</label>
                     <input id="regex-text" class="field field-mono text-base" value="@Expression" @oninput="e => SetExpressionAsync(e.Value?.ToString())"
@@ -55,7 +55,7 @@
                     <VerdictBadge Verdict="accepted ? Verdict.Accepted : Verdict.Rejected" />
                 }
             </div>
-            <div class="space-y-2 p-4">
+            <div class="space-y-2 p-5">
                 <label class="label" for="regex-word">Is w ∈ L(R)?</label>
                 <input id="regex-word" class="field field-mono" @bind="word" @bind:event="oninput" @bind:after="CheckMembership" placeholder="e (empty string)" spellcheck="false" />
                 <p class="text-xs text-muted">Checked live by simulating the e-NFA built from R.</p>
@@ -78,7 +78,7 @@
                 }
             }
         </div>
-        <div class="space-y-3 p-4">
+        <div class="space-y-3 p-5">
             <div class="flex gap-1 rounded-lg border border-line p-0.5 text-sm">
                 <button type="button" class="@($"flex-1 rounded-md px-2 py-1.5 {(compareWithMachine ? "" : "bg-ink text-surface")}")" @onclick="() => compareWithMachine = false">Another regex</button>
                 <button type="button" class="@($"flex-1 rounded-md px-2 py-1.5 {(compareWithMachine ? "bg-ink text-surface" : "")}")" @onclick="() => compareWithMachine = true">A DFA / NFA</button>

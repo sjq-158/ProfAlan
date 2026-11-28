@@ -11,7 +11,7 @@
             @switch (block.Kind)
             {
                 case NoteKind.Definition:
-                    <section class="rounded-lg border border-line bg-surface/60 p-4">
+                    <section class="rounded-lg border border-line bg-surface/60 p-5">
                         <p class="eyebrow mb-2">Definition · @block.Title</p>
                         <p class="leading-relaxed">@block.Text</p>
                         @if (block.Formal is not null)
@@ -21,7 +21,7 @@
                     </section>
                     break;
                 case NoteKind.Example:
-                    <section class="rounded-lg border border-line p-4">
+                    <section class="rounded-lg border border-line p-5">
                         <p class="eyebrow mb-2">Worked example · @block.Title</p>
                         <p class="leading-relaxed">@block.Text</p>
                         @if (block.Formal is not null)

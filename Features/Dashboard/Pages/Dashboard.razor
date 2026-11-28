@@ -7,7 +7,7 @@
 
 <PageTitle>Dashboard · ProfAlan</PageTitle>
 
-<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+<div class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
     <PageHeader Eyebrow="@($"{Auth.Current?.Role} dashboard")" Title="@($"{Greeting}, {FirstName}")"
                 Subtitle="Pick up where you left off, or start something new.">
         <Actions>
@@ -18,7 +18,7 @@
     <section class="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         @foreach (var (slug, label, icon, caption) in QuickStarts)
         {
-            <a href="@($"sandbox?kind={slug}")" class="card group flex flex-col gap-3 p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+            <a href="@($"sandbox?kind={slug}")" class="card group flex flex-col gap-3 p-5 transition hover:-translate-y-0.5 hover:shadow-md">
                 <span class="grid size-9 place-items-center rounded-lg bg-soft transition group-hover:bg-ink group-hover:text-surface"><Icon Name="@icon" /></span>
                 <span>
                     <span class="block font-medium">@label</span>
@@ -46,7 +46,7 @@
             }
             else if (machines.Count == 0)
             {
-                <div class="p-4">
+                <div class="p-5">
                     <EmptyState IconName="folder" Title="No saved machines yet" Message="Build something in the sandbox and press Save to keep it here.">
                         <a href="sandbox?sample=dfa-a-bb" class="btn">Start from an example</a>
                     </EmptyState>
@@ -208,7 +208,7 @@
 
     private RenderFragment Stat(string label, int? value, string icon) => __builder =>
     {
-        <div class="card flex items-center gap-4 p-4">
+        <div class="card flex items-center gap-4 p-5">
             <span class="grid size-10 place-items-center rounded-lg bg-soft"><Icon Name="@icon" /></span>
             <div>
                 <p class="font-mono text-2xl font-semibold">@(value?.ToString() ?? "–")</p>
