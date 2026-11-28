@@ -8,30 +8,20 @@
     <PublicHeader />
 
     <main class="flex-1">
-        <section class="mx-auto max-w-4xl px-4 pb-6 pt-16 text-center sm:px-8">
-            <p class="eyebrow fade-up">About us</p>
-            <h1 class="fade-up mt-4 font-display text-5xl leading-tight sm:text-6xl" style="animation-delay:.06s">
-                Making the theory of computation <span class="marker">visible</span>
-            </h1>
-            <p class="fade-up mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted" style="animation-delay:.12s">
-                ProfAlan is a learning, simulation and assessment platform for automata theory and formal languages,
-                built as the final project for CSIT321, Applications Development and Emerging Technologies.
-            </p>
-        </section>
-
-        <section class="mx-auto mt-16 grid max-w-6xl items-center gap-12 px-4 sm:px-8 lg:grid-cols-2">
+        <section class="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-12 sm:px-8 lg:grid-cols-[1.1fr_1fr]">
             <div>
-                <p class="eyebrow">Why we built it</p>
-                <h2 class="mt-3 font-display text-4xl leading-tight">Automata are easier to understand when you can watch them run</h2>
-                <div class="mt-5 space-y-4 text-lg leading-relaxed text-muted">
+                <p class="eyebrow fade-up">About us</p>
+                <h1 class="fade-up mt-4 font-display text-5xl leading-tight" style="animation-delay:.06s">
+                    Making the theory of computation <span class="marker">visible</span>
+                </h1>
+                <div class="fade-up mt-6 space-y-4 text-lg leading-relaxed text-muted" style="animation-delay:.12s">
                     <p>
                         On paper, a state diagram is a still picture. It is hard to see why a string is rejected, which
                         transition is missing, or what a pushdown automaton's stack looks like halfway through.
                     </p>
                     <p>
-                        ProfAlan turns each machine into something you can step through. It checks your definitions
-                        the way an instructor would and grades practice problems instantly, so feedback arrives while
-                        the idea is still fresh.
+                        ProfAlan turns each machine into something you can step through, checks it against the formal
+                        definition, and grades practice problems instantly, so feedback arrives while the idea is still fresh.
                     </p>
                 </div>
             </div>
@@ -42,80 +32,73 @@
             </PreviewFrame>
         </section>
 
-        <section class="mx-auto mt-28 max-w-6xl px-4 sm:px-8">
-            <div class="text-center">
-                <p class="eyebrow">Grounded in the textbook</p>
-                <h2 class="mt-3 font-display text-4xl">Every definition follows Lewis &amp; Papadimitriou</h2>
-                <p class="mx-auto mt-4 max-w-2xl text-muted">
-                    <em>Elements of the Theory of Computation</em>, 2nd edition. What the checkers enforce and how
-                    configurations are written match what is taught in class.
-                </p>
-            </div>
-            <div class="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                @foreach (var (name, tuple, rule) in Definitions)
-                {
-                    <div class="rounded-2xl border border-line bg-card p-5">
-                        <p class="text-sm font-semibold">@name</p>
-                        <p class="mt-3 font-mono text-lg">@tuple</p>
-                        <p class="mt-2 font-mono text-xs leading-relaxed text-muted">@rule</p>
-                    </div>
-                }
+        <section class="mx-auto mt-20 max-w-6xl px-4 sm:px-8">
+            <div class="grid overflow-hidden rounded-2xl border border-line bg-card md:grid-cols-2">
+                <div class="p-8 sm:p-10">
+                    <p class="font-mono text-sm text-muted">01</p>
+                    <h2 class="mt-2 font-display text-3xl">Vision</h2>
+                    <p class="mt-4 text-lg leading-relaxed">
+                        A world where every learner can watch a machine compute, not just read about it, and where
+                        formal languages feel as concrete as the code they power.
+                    </p>
+                </div>
+                <div class="border-t border-line p-8 sm:p-10 md:border-l md:border-t-0">
+                    <p class="font-mono text-sm text-muted">02</p>
+                    <h2 class="mt-2 font-display text-3xl">Mission</h2>
+                    <p class="mt-4 text-lg leading-relaxed">
+                        To make automata theory hands-on by giving students and instructors faithful simulators,
+                        precise feedback and fair automatic grading, free and in the browser.
+                    </p>
+                </div>
             </div>
         </section>
 
-        <section class="mx-auto mt-28 max-w-6xl px-4 sm:px-8">
-            <div class="text-center">
-                <p class="eyebrow">Who it is for</p>
-                <h2 class="mt-3 font-display text-4xl">Built for both sides of the classroom</h2>
+        <section class="mx-auto mt-20 grid max-w-6xl gap-10 px-4 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+            <div>
+                <h2 class="font-display text-3xl leading-tight">Every definition follows Lewis &amp; Papadimitriou</h2>
+                <p class="mt-4 leading-relaxed text-muted">
+                    <em>Elements of the Theory of Computation</em>, 2nd edition. What the checkers enforce and how
+                    configurations are written match the textbook exactly.
+                </p>
             </div>
-            <div class="mt-10 grid gap-5 lg:grid-cols-2">
-                @foreach (var (title, icon, items) in Audiences)
+            <dl class="divide-y divide-line rounded-2xl border border-line bg-card">
+                @foreach (var (name, tuple, rule) in Definitions)
                 {
-                    <article class="rounded-3xl border border-line bg-card p-8">
-                        <span class="grid size-12 place-items-center rounded-xl border border-line bg-surface/60"><Icon Name="@icon" Class="size-5" /></span>
-                        <h3 class="mt-6 text-2xl font-semibold">@title</h3>
-                        <ul class="mt-5 space-y-3">
+                    <div class="grid gap-1 px-6 py-5 sm:grid-cols-[13rem_1fr] sm:gap-6">
+                        <dt>
+                            <span class="font-semibold">@name</span>
+                            <span class="mt-1 block font-mono text-sm text-muted">@tuple</span>
+                        </dt>
+                        <dd class="font-mono text-sm leading-relaxed">@rule</dd>
+                    </div>
+                }
+            </dl>
+        </section>
+
+        <section class="mx-auto mt-20 max-w-6xl px-4 sm:px-8">
+            <h2 class="font-display text-3xl">Who it is for</h2>
+            <div class="mt-8 grid gap-10 border-t border-line pt-8 lg:grid-cols-2">
+                @foreach (var (title, items) in Audiences)
+                {
+                    <div>
+                        <h3 class="text-xl font-semibold">@title</h3>
+                        <ul class="mt-4 space-y-3">
                             @foreach (var item in items)
                             {
                                 <li class="flex gap-3"><Icon Name="check" Class="mt-1 size-4 text-pass" /><span class="leading-relaxed">@item</span></li>
                             }
                         </ul>
-                    </article>
-                }
-            </div>
-        </section>
-
-        <section class="mx-auto mt-28 max-w-6xl px-4 sm:px-8">
-            <div class="text-center">
-                <p class="eyebrow">How it is built</p>
-                <h2 class="mt-3 font-display text-4xl">Modern web technology, careful engineering</h2>
-            </div>
-            <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                @foreach (var (name, role, icon) in Stack)
-                {
-                    <div class="rounded-2xl border border-line bg-card p-5">
-                        <Icon Name="@icon" Class="size-5" />
-                        <p class="mt-4 font-semibold">@name</p>
-                        <p class="mt-1 text-sm leading-relaxed text-muted">@role</p>
                     </div>
                 }
             </div>
-            <p class="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-muted">
-                The formal engines (DFA, NFA, PDA and TM simulators, the regular-expression and grammar tools) are plain C#
-                with their own automated tests. Data is protected by database row-level security, and the AI key
-                never leaves the server.
-            </p>
         </section>
 
-        <section class="mx-auto mt-28 max-w-3xl px-4 sm:px-8">
-            <div class="text-center">
-                <p class="eyebrow">Questions</p>
-                <h2 class="mt-3 font-display text-4xl">Frequently asked</h2>
-            </div>
-            <div class="mt-10 space-y-3">
+        <section class="mx-auto mt-20 grid max-w-6xl gap-10 px-4 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+            <h2 class="font-display text-3xl leading-tight">Frequently Asked Questions</h2>
+            <div class="space-y-3">
                 @foreach (var (question, answer) in Faq)
                 {
-                    <details class="group rounded-2xl border border-line bg-card px-6 py-4">
+                    <details class="group rounded-2xl border border-line bg-card px-6 py-5">
                         <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
                             @question
                             <Icon Name="chevron-down" Class="size-4 transition group-open:rotate-180" />
@@ -126,18 +109,39 @@
             </div>
         </section>
 
-        <section class="mx-auto mt-28 max-w-3xl px-4 text-center sm:px-8">
-            <p class="eyebrow">The course</p>
-            <h2 class="mt-3 font-display text-3xl">CSIT321 · Applications Development and Emerging Technologies</h2>
-            <p class="mt-4 text-muted">Final project, first semester, school year 2026–2027.</p>
-            <AuthorizeView>
-                <Authorized>
-                    <a href="dashboard" class="raised-button mt-10">Go to dashboard</a>
-                </Authorized>
-                <NotAuthorized>
-                    <a href="register" class="raised-button mt-10">Sign up free</a>
-                </NotAuthorized>
-            </AuthorizeView>
+        <section id="contact" class="mx-auto mt-20 max-w-6xl scroll-mt-8 px-4 sm:px-8">
+            <div class="grid overflow-hidden rounded-2xl border border-line bg-card lg:grid-cols-[1fr_1.2fr]">
+                <div class="bg-soft p-8 sm:p-10">
+                    <h2 class="font-display text-3xl">Get in touch</h2>
+                    <p class="mt-4 leading-relaxed text-muted">
+                        Found a bug, have an idea for a checker, or want to use ProfAlan with your students?
+                        Send a message and it will reach the developer directly.
+                    </p>
+                    <a href="@($"mailto:{DeveloperEmail}")" class="btn-pill btn-pill-primary mt-8"><Icon Name="send" /> Send an email</a>
+                </div>
+                <div class="p-8 sm:p-10">
+                    <p class="eyebrow">Developer</p>
+                    <div class="mt-4 flex items-center gap-4">
+                        <span class="grid size-14 shrink-0 place-items-center rounded-full bg-ink font-display text-xl text-surface">EL</span>
+                        <div>
+                            <p class="text-xl font-semibold">Ericka Fatima Reign R. Ligaray</p>
+                            <p class="text-muted">Designer and developer of ProfAlan</p>
+                        </div>
+                    </div>
+                    <dl class="mt-8 divide-y divide-line border-y border-line">
+                        <div class="flex items-center gap-4 py-4">
+                            <Icon Name="mail" Class="size-5 text-muted" />
+                            <dt class="sr-only">Email</dt>
+                            <dd class="min-w-0"><a href="@($"mailto:{DeveloperEmail}")" class="break-all font-mono text-sm underline-offset-4 hover:underline">@DeveloperEmail</a></dd>
+                        </div>
+                        <div class="flex items-center gap-4 py-4">
+                            <Icon Name="github" Class="size-5 text-muted" />
+                            <dt class="sr-only">GitHub</dt>
+                            <dd><a href="https://github.com/sjq-158" target="_blank" rel="noopener" class="font-mono text-sm underline-offset-4 hover:underline">github.com/sjq-158</a></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -145,6 +149,8 @@
 </div>
 
 @code {
+    private const string DeveloperEmail = "erickafatimareignrligaray@gmail.com";
+
     private readonly Automaton example = SampleLibrary.Find("dfa-b-mod-3")!.Build();
 
     private static readonly (string Name, string Tuple, string Rule)[] Definitions =
@@ -155,15 +161,15 @@
         ("Turing machine", "(K, Σ, δ, s, H)", "starts at (s, ▷⊔w), must move → on ▷, halts in H")
     ];
 
-    private static readonly (string Title, string Icon, string[] Items)[] Audiences =
+    private static readonly (string Title, string[] Items)[] Audiences =
     [
-        ("For students", "graduation",
+        ("For students",
         [
             "See which configuration goes wrong instead of guessing why a string is rejected.",
-            "Practise with worked examples from the midterm review and unlimited AI-generated problems.",
+            "Practise with worked examples and unlimited AI-generated problems.",
             "Get instant, specific feedback on every DFA, PDA, Turing machine, regex or grammar you build."
         ]),
-        ("For instructors", "book",
+        ("For instructors",
         [
             "Publish problems with visible and hidden test cases, graded automatically.",
             "Generate test strings and label them from a reference regex or grammar in one click.",
@@ -171,20 +177,12 @@
         ])
     ];
 
-    private static readonly (string Name, string Role, string Icon)[] Stack =
-    [
-        ("Blazor WebAssembly", "The whole app, including every simulator, runs in the browser in C#.", "graph"),
-        ("Tailwind CSS", "A clean, minimal interface with switchable color themes.", "palette"),
-        ("Supabase", "Accounts, saved machines, quizzes and submissions, protected by row-level security.", "shield"),
-        ("Google Gemini", "Free-tier AI for practice problems, called through a server function that keeps the key secret.", "wand")
-    ];
-
     private static readonly (string Question, string Answer)[] Faq =
     [
         ("Is ProfAlan free?", "Yes. Create an account with your email to save machines, take quizzes and use the AI study tools."),
         ("Which machines can I build?", "Deterministic and nondeterministic finite automata, pushdown automata and Turing machines, plus context-free grammars and regular expressions."),
         ("Can I trust the AI-generated problems?", "ProfAlan does not take the AI's word for it. Every expected answer is recomputed from a reference solution by ProfAlan's own engines before you see it."),
-        ("Do hidden test cases stay hidden?", "Yes. Solvers only see whether a hidden case passed, never its input. In the database, hidden cases are readable only by the problem's author."),
+        ("Do hidden test cases stay hidden?", "Yes. Solvers only see whether a hidden case passed, never its input."),
         ("Why does a DFA need a trap state?", "In Lewis & Papadimitriou, δ is a function on every state and symbol. ProfAlan flags missing transitions and can add the trap state for you.")
     ];
 }
