@@ -1,18 +1,15 @@
-@* A static, non-interactive snapshot of part of the app, framed like a window. *@
-<figure class="overflow-hidden rounded-3xl border border-line bg-card shadow-xl">
-    <div class="flex items-center gap-2 border-b border-line px-4 py-3">
-        <span class="size-2.5 rounded-full bg-fail/60"></span>
-        <span class="size-2.5 rounded-full bg-warn/60"></span>
-        <span class="size-2.5 rounded-full bg-pass/60"></span>
-        <span class="ml-2 truncate font-mono text-xs text-muted">@Title</span>
-        <span class="badge-muted ml-auto">Preview</span>
+@* A static, non-interactive snapshot of part of the app. *@
+<figure class="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
+    <div class="flex items-center gap-3 border-b border-line px-6 py-4">
+        <span class="truncate text-sm font-semibold">@Title</span>
+        <span class="badge-muted ml-auto shrink-0">Preview</span>
     </div>
     <div class="pointer-events-none select-none" aria-hidden="true">
         @ChildContent
     </div>
     @if (Caption is not null)
     {
-        <figcaption class="border-t border-line px-4 py-3 text-xs text-muted">@Caption</figcaption>
+        <figcaption class="border-t border-line px-6 py-4 text-sm text-muted">@Caption</figcaption>
     }
 </figure>
 

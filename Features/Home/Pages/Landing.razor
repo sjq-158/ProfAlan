@@ -8,7 +8,7 @@
     <PublicHeader />
 
     <main class="relative flex-1">
-        <section class="relative mx-auto max-w-7xl px-4 pb-24 pt-16 text-center sm:px-8 sm:pt-24">
+        <section class="relative mx-auto max-w-7xl px-4 pb-20 pt-16 text-center sm:px-8 sm:pt-20">
             @foreach (var tile in Tiles)
             {
                 <span class="@($"float-tile absolute hidden place-items-center rounded-2xl bg-card font-mono font-semibold shadow-lg lg:grid {tile.Position}")"
@@ -56,7 +56,7 @@
         </div>
         <p class="mt-4 text-center font-mono text-sm text-muted">Lewis &amp; Papadimitriou, <em>Elements of the Theory of Computation</em>, 2nd edition</p>
 
-        <section id="features" class="mx-auto mt-20 grid max-w-6xl scroll-mt-8 gap-6 px-4 sm:px-8 md:grid-cols-2 lg:grid-cols-3" aria-label="Features">
+        <section id="features" class="mx-auto mt-16 grid max-w-6xl scroll-mt-8 gap-6 px-4 sm:px-8 md:grid-cols-2 lg:grid-cols-3" aria-label="Features">
             @foreach (var card in Cards)
             {
                 <article class="rounded-3xl border border-line bg-card p-8 shadow-sm">
@@ -73,13 +73,12 @@
             <a href="features" class="btn-pill bg-card">See every feature in detail <Icon Name="arrow-right" /></a>
         </div>
 
-        <section id="about" class="mx-auto mt-24 max-w-3xl scroll-mt-8 px-4 text-center sm:px-8">
+        <section id="about" class="mx-auto mt-20 max-w-3xl scroll-mt-8 px-4 text-center sm:px-8">
             <p class="eyebrow">About us</p>
-            <h2 class="mt-3 font-display text-3xl sm:text-4xl">Built for the automata theory classroom</h2>
+            <h2 class="mt-3 font-display text-3xl sm:text-4xl">Built for learning automata theory</h2>
             <p class="mt-5 leading-relaxed text-muted">
-                ProfAlan is a final project for CSIT321, Applications Development and Emerging Technologies.
-                It gives students one place to learn, simulate and be assessed on formal languages, and gives
-                instructors CodeChum-style problems with hidden test cases.
+                ProfAlan gives students one place to learn, simulate and be assessed on formal languages, and gives
+                instructors automatically graded problems with hidden test cases.
             </p>
             <a href="about" class="btn-pill mt-8 bg-card">More about ProfAlan <Icon Name="arrow-right" /></a>
         </section>

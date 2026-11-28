@@ -28,11 +28,11 @@
             }
         </nav>
 
-        <div class="mx-auto mt-16 max-w-6xl space-y-28 px-4 sm:px-8">
+        <div class="mx-auto mt-12 max-w-6xl space-y-20 px-4 sm:px-8">
             @Row("builders", "Builders", "Draw it, or fill in the table",
                 "Construct DFAs, NFAs, PDAs and Turing machines on an infinite canvas you can zoom and pan like Desmos, or fill in the transition table row by row. Both views edit the same machine, so a change in one appears instantly in the other.",
                 ["Drag states in from a shape palette, then pull a transition from the + handle, as in draw.io.",
-                 "Finite automata use the dot notation from class: small states, names underneath, a ring for final states.",
+                 "Finite automata use compact dot notation: small states, names underneath, a ring for final states.",
                  "The table lists every (q, σ) pair, so a missing transition is impossible to miss."],
                 BuilderSnap, flip: false)
 
@@ -50,7 +50,7 @@
                  "Grammars show a leftmost derivation and parse tree; regular expressions can be compared for equivalence."],
                 CheckerSnap, flip: false)
 
-            @Row("quizzes", "Quiz Arena", "CodeChum-style problems for automata",
+            @Row("quizzes", "Quiz Arena", "Automatically graded automata problems",
                 "Instructors describe a language and add visible and hidden test cases. Students submit a machine, a regular expression or a grammar and are graded automatically.",
                 ["Hidden cases are never shown, only whether they passed.",
                  "Instructors can generate every string up to a length and label them from a reference answer.",
@@ -58,14 +58,14 @@
                 QuizSnap, flip: true)
 
             @Row("study", "AI Study Area", "Notes, examples and generated practice",
-                "Read short notes for each chapter of the textbook, then practise with problems written by Google Gemini. ProfAlan re-checks every answer the AI gives before you see it.",
+                "Read short notes for each chapter of Lewis &amp; Papadimitriou, then practise with problems written by Google Gemini. ProfAlan re-checks every answer the AI gives before you see it.",
                 ["Seven topics from alphabets and languages to Turing machines.",
                  "Generated problems come with a hint, a reference answer and a test suite.",
                  "Any test verdict that disagrees with the reference answer is corrected automatically."],
                 StudySnap, flip: false)
         </div>
 
-        <section class="mx-auto mt-28 max-w-3xl px-4 text-center sm:px-8">
+        <section class="mx-auto mt-20 max-w-3xl px-4 text-center sm:px-8">
             <h2 class="font-display text-4xl">Ready to try it?</h2>
             <p class="mt-4 text-muted">Create a free account to save your machines and take quizzes.</p>
             <AuthorizeView>
@@ -152,12 +152,12 @@
                 {
                     <table class="w-full border-line odd:border-r">
                         <thead class="bg-soft font-sans text-muted">
-                            <tr><th class="px-3 py-1.5 text-left font-medium">q</th><th class="px-3 py-1.5 text-left font-medium">σ</th><th class="px-3 py-1.5 text-left font-medium">δ(q, σ)</th></tr>
+                            <tr><th class="px-4 py-2 text-left font-medium">q</th><th class="px-4 py-2 text-left font-medium">σ</th><th class="px-4 py-2 text-left font-medium">δ(q, σ)</th></tr>
                         </thead>
                         <tbody>
                             @foreach (var rule in half)
                             {
-                                <tr class="border-t border-line"><td class="px-3 py-1">@rule.From</td><td class="px-3 py-1">@rule.Read</td><td class="px-3 py-1">@rule.To</td></tr>
+                                <tr class="border-t border-line"><td class="px-4 py-1.5">@rule.From</td><td class="px-4 py-1.5">@rule.Read</td><td class="px-4 py-1.5">@rule.To</td></tr>
                             }
                         </tbody>
                     </table>
@@ -169,7 +169,7 @@
     private RenderFragment VisualizerSnap => __builder =>
     {
         <PreviewFrame Title="Visualizer · TM deciding aⁿbⁿ on w = aabb" Caption="A Turing machine mid-computation, next to a PDA's stack.">
-            <div class="space-y-4 p-5">
+            <div class="space-y-5 p-6">
                 <div class="flex items-center gap-2 text-sm">
                     <span class="text-muted">State</span>
                     <span class="rounded-md bg-ink px-2 py-0.5 font-mono text-surface">@tmStep.State</span>
@@ -177,7 +177,7 @@
                 </div>
                 <TapeView Tape="@tmStep.Tape" Head="tmStep.Head" />
                 <div class="grid gap-4 sm:grid-cols-[1fr_auto]">
-                    <ol class="space-y-1 rounded-lg border border-line bg-surface/50 p-3 font-mono text-[12px]">
+                    <ol class="space-y-1 rounded-lg border border-line bg-surface/50 p-4 font-mono text-[12px]">
                         @for (var i = 0; i <= 6 && i < tmPath.Count; i++)
                         {
                             <li class="@(i == 6 ? "rounded bg-ink px-1 text-surface" : "")">@(i == 0 ? "  " : "⊢ ")@ConfigurationNotation.Format(MachineKind.Turing, tmPath[i])</li>
@@ -195,10 +195,10 @@
     private RenderFragment CheckerSnap => __builder =>
     {
         <PreviewFrame Title="Checkers · DFA, regex and grammar">
-            <div class="space-y-4 p-5">
+            <div class="space-y-5 p-6">
                 <DefinitionIssues Machine="partialDfa" ReadOnly="true" />
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="rounded-xl border border-line bg-surface/50 p-4 text-sm">
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div class="rounded-xl border border-line bg-surface/50 p-5 text-sm">
                         <p class="eyebrow mb-2">Regex equivalence</p>
                         <p class="font-mono text-xs">a(a ∪ b)*bb  vs  (a ∪ b)*bb</p>
                         @if (difference is not null)
@@ -206,7 +206,7 @@
                             <p class="mt-2">Counterexample: <span class="font-mono font-semibold">w = @Symbols.Show(difference.Word)</span></p>
                         }
                     </div>
-                    <div class="rounded-xl border border-line bg-surface/50 p-4">
+                    <div class="rounded-xl border border-line bg-surface/50 p-5">
                         <p class="eyebrow mb-2">Leftmost derivation</p>
                         <p class="font-mono text-xs">@string.Join(" ⇒ ", derivation?.Steps.Select(s => s.Form.Length == 0 ? "e" : s.Form) ?? [])</p>
                         @if (derivation is not null)
@@ -222,7 +222,7 @@
     private RenderFragment QuizSnap => __builder =>
     {
         <PreviewFrame Title="Quiz Arena · Starts with a and ends with bb" Caption="Sample cases show the string; hidden cases show only the result.">
-            <div class="max-h-[26rem] overflow-hidden p-4">
+            <div class="max-h-[26rem] overflow-hidden p-6">
                 <GradeResults Report="report" IsSubmission="true" />
             </div>
         </PreviewFrame>
@@ -231,7 +231,7 @@
     private RenderFragment StudySnap => __builder =>
     {
         <PreviewFrame Title="Study Area · AI practice generator" Caption="An example of a generated problem after ProfAlan has verified it.">
-            <div class="space-y-4 p-5">
+            <div class="space-y-5 p-6">
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="chip">DFA</span>
                     <span class="chip">Σ = {a, b}</span>
